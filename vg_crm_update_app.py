@@ -8,127 +8,109 @@ st.set_page_config(
 )
 
 st.title("🔄 Recurring Gift Update Builder")
-st.markdown("Populate update templates using CRM exports and schedule data.")
 
 # -----------------------------
-# File Uploads
+# Uploads
 # -----------------------------
-st.sidebar.header("Upload Files")
 update_file = st.sidebar.file_uploader("Update Template", type=["csv"])
 schedule_file = st.sidebar.file_uploader("Schedule File", type=["csv"])
 crm_file = st.sidebar.file_uploader("CRM Export", type=["csv"])
 
 if not update_file or not schedule_file or not crm_file:
-    st.sidebar.warning("Please upload all three files.")
+    st.warning("Please upload all three files.")
+    st.stop()
 
-if update_file and schedule_file and crm_file:
+# -----------------------------
+# Load Files (lightweight)
+# -----------------------------
+update = pd.read_csv(update_file, dtype=str)
+schedule = pd.read_csv(schedule_file, dtype=str)
+crm = pd.read_csv(crm_file, dtype=str)
 
-    with st.spinner("Processing..."):
+# -----------------------------
+# Column Validation (prevents crashes)
+# -----------------------------
+required_update = ["LegacyId"]
+required_crm = ["Recurring Gift Transaction Id", "Recurring Gift Id"]
+required_schedule = ["LegacyId", "RecurringId"]
 
-        # -----------------------------
-        # Load Files
-        # -----------------------------
-        update = pd.read_csv(update_file)
-        schedule = pd.read_csv(schedule_file)
-        crm = pd.read_csv(crm_file)
+for col in required_update:
+    if col not in update.columns:
+        st.error(f"Update file missing column: {col}")
+        st.stop()
 
-        # -----------------------------
-        # Normalize key fields
-        # -----------------------------
-        update["LegacyId"] = update["LegacyId"].astype(str).str.strip()
+for col in required_crm:
+    if col not in crm.columns:
+        st.error(f"CRM file missing column: {col}")
+        st.stop()
 
-        crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].astype(str).str.strip()
-        crm["Recurring Gift Id"] = crm["Recurring Gift Id"].astype(str).str.strip()
+for col in required_schedule:
+    if col not in schedule.columns:
+        st.error(f"Schedule file missing column: {col}")
+        st.stop()
 
-        schedule["LegacyId"] = schedule["LegacyId"].astype(str).str.strip()
-        schedule["RecurringId"] = schedule["RecurringId"].astype(str).str.strip()
+# -----------------------------
+# Normalize keys
+# -----------------------------
+update["LegacyId"] = update["LegacyId"].str.strip()
+crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].str.strip()
+crm["Recurring Gift Id"] = crm["Recurring Gift Id"].str.strip()
+schedule["LegacyId"] = schedule["LegacyId"].str.strip()
+schedule["RecurringId"] = schedule["RecurringId"].str.strip()
 
-        # -----------------------------
-        # STEP 1: CRM → Update
-        # Populate RecurringId
-        # -----------------------------
-        crm_subset = crm[[
-            "Recurring Gift Transaction Id",
-            "Recurring Gift Id"
-        ]].drop_duplicates()
+# -----------------------------
+# Build lookup dictionaries (FAST + SAFE)
+# -----------------------------
 
-        crm_subset = crm_subset.rename(columns={
-            "Recurring Gift Transaction Id": "LegacyId",
-            "Recurring Gift Id": "RecurringId"
-        })
+# CRM: LegacyId -> RecurringId
+crm_lookup = (
+    crm.drop_duplicates("Recurring Gift Transaction Id")
+    .set_index("Recurring Gift Transaction Id")["Recurring Gift Id"]
+)
 
-        update = update.merge(
-            crm_subset,
-            on="LegacyId",
-            how="left"
-        )
+# Schedule: LegacyId -> RecurringId (for NewTransactionId)
+schedule_lookup = (
+    schedule.drop_duplicates("LegacyId")
+    .set_index("LegacyId")["RecurringId"]
+)
 
-        # -----------------------------
-        # STEP 2: Schedule → Update
-        # Populate NewTransactionId
-        # -----------------------------
-        schedule_subset = schedule[[
-            "LegacyId",
-            "RecurringId"
-        ]].drop_duplicates()
+# -----------------------------
+# Apply mappings (NO MERGE = NO CRASH)
+# -----------------------------
+update["RecurringId"] = update["LegacyId"].map(crm_lookup)
+update["NewTransactionId"] = update["LegacyId"].map(schedule_lookup)
 
-        schedule_subset = schedule_subset.rename(columns={
-            "RecurringId": "NewTransactionId"
-        })
+# -----------------------------
+# Metrics
+# -----------------------------
+missing_recurring = update["RecurringId"].isna().sum()
+missing_new_txn = update["NewTransactionId"].isna().sum()
 
-        update = update.merge(
-            schedule_subset,
-            on="LegacyId",
-            how="left"
-        )
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Rows", len(update))
+col2.metric("Missing RecurringId", missing_recurring)
+col3.metric("Missing NewTransactionId", missing_new_txn)
 
-        # -----------------------------
-        # Data Quality Checks
-        # -----------------------------
-        missing_recurring = update["RecurringId"].isna().sum()
-        missing_new_txn = update["NewTransactionId"].isna().sum()
+# -----------------------------
+# Preview
+# -----------------------------
+st.dataframe(update, use_container_width=True)
 
-    # -----------------------------
-    # Dashboard
-    # -----------------------------
-    st.subheader("Summary")
-    col1, col2, col3 = st.columns(3)
+# -----------------------------
+# Download
+# -----------------------------
+csv = update.to_csv(index=False).encode("utf-8")
+st.download_button("Download Updated File", csv, "updated_file.csv")
 
-    col1.metric("Total Rows", len(update))
-    col2.metric("Missing RecurringId (CRM)", missing_recurring)
-    col3.metric("Missing NewTransactionId (Schedule)", missing_new_txn)
+# -----------------------------
+# Problem Rows
+# -----------------------------
+problem_rows = update[
+    (update["RecurringId"].isna()) |
+    (update["NewTransactionId"].isna())
+]
 
-    # -----------------------------
-    # Preview
-    # -----------------------------
-    st.subheader("Preview")
-    st.dataframe(update, use_container_width=True)
-
-    # -----------------------------
-    # Download
-    # -----------------------------
-    csv = update.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "Download Updated File",
-        csv,
-        "recurring_updates.csv",
-        "text/csv"
-    )
-
-    # -----------------------------
-    # Problem Rows
-    # -----------------------------
-    problem_rows = update[
-        (update["RecurringId"].isna()) |
-        (update["NewTransactionId"].isna())
-    ]
-
-    if len(problem_rows) > 0:
-        st.subheader("Problem Rows")
-        problem_csv = problem_rows.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "Download Problem Rows",
-            problem_csv,
-            "problem_rows.csv",
-            "text/csv"
-        )
+if len(problem_rows) > 0:
+    st.subheader("Problem Rows")
+    problem_csv = problem_rows.to_csv(index=False).encode("utf-8")
+    st.download_button("Download Problem Rows", problem_csv, "problem_rows.csv")
