@@ -48,7 +48,7 @@ for col in required_crm:
         st.stop()
 
 # -----------------------------
-# Normalize key fields
+# Normalize IDs
 # -----------------------------
 update["LegacyId"] = update["LegacyId"].astype(str).str.strip()
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].astype(str).str.strip()
@@ -70,37 +70,24 @@ if dup_update > 0:
     st.warning("Duplicate LegacyIds found in Update file.")
 
 if dup_crm > 0:
-    st.warning("Duplicate Transaction IDs found in CRM file (first match will be used).")
-
-# Optional: download duplicates
-dup_rows = update[update["LegacyId"].duplicated(keep=False)]
-if len(dup_rows) > 0:
-    st.download_button(
-        "Download Duplicate Update Rows",
-        dup_rows.to_csv(index=False).encode("utf-8"),
-        "duplicate_update_rows.csv"
-    )
+    st.warning("Duplicate Transaction IDs found in CRM file.")
 
 # -----------------------------
-# Build CRM lookup
+# Build CRM lookup (safe)
 # -----------------------------
 crm_lookup = (
-    crm.drop_duplicates("Recurring Gift Transaction Id")
+    crm.dropna(subset=["Recurring Gift Id"])
+    .drop_duplicates(subset="Recurring Gift Transaction Id")
     .set_index("Recurring Gift Transaction Id")["Recurring Gift Id"]
 )
 
 # -----------------------------
-# Mapping
+# Mapping (core logic)
 # -----------------------------
-# RecurringId from CRM
 update["RecurringId"] = update["LegacyId"].map(crm_lookup)
-
-# NewTransactionId with rd2- prefix
 update["NewTransactionId"] = update["LegacyId"].apply(
     lambda x: f"rd2-{x}" if pd.notna(x) else None
 )
-
-# Transaction source
 update["TransactionSource"] = "RaiseDonors"
 
 # -----------------------------
@@ -134,7 +121,7 @@ update.loc[mask, name_col] = "Processing Fees"
 update.loc[mask, amount_col] = update.loc[mask, "Costs"]
 
 # -----------------------------
-# Metrics
+# Summary Metrics
 # -----------------------------
 missing_recurring = update["RecurringId"].isna().sum()
 missing_txn = update["NewTransactionId"].isna().sum()
@@ -147,15 +134,75 @@ col2.metric("Missing RecurringId", missing_recurring)
 col3.metric("Missing NewTransactionId", missing_txn)
 
 # -----------------------------
-# Preview
+# Preview Output
 # -----------------------------
+st.subheader("Preview Output")
 st.dataframe(update, use_container_width=True)
 
 # -----------------------------
-# Download
+# Download Output
 # -----------------------------
 csv = update.to_csv(index=False).encode("utf-8")
 st.download_button("Download Updated File", csv, "crm_updates.csv")
+
+# =========================================================
+# 🔍 MAPPING DEBUGGER PANEL
+# =========================================================
+st.subheader("🔍 Mapping Debugger")
+
+# Merge for inspection
+debug_df = update.merge(
+    crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]],
+    how="left",
+    left_on="LegacyId",
+    right_on="Recurring Gift Transaction Id"
+)
+
+# Match status
+debug_df["MatchStatus"] = debug_df["Recurring Gift Id"].apply(
+    lambda x: "Matched" if pd.notna(x) else "No Match"
+)
+
+# Metrics
+matched_count = (debug_df["MatchStatus"] == "Matched").sum()
+unmatched_count = (debug_df["MatchStatus"] == "No Match").sum()
+
+col1, col2 = st.columns(2)
+col1.metric("Matched Rows", matched_count)
+col2.metric("Unmatched Rows", unmatched_count)
+
+# Filter
+status_filter = st.selectbox(
+    "Filter rows",
+    ["All", "Matched", "No Match"]
+)
+
+if status_filter == "Matched":
+    filtered = debug_df[debug_df["MatchStatus"] == "Matched"]
+elif status_filter == "No Match":
+    filtered = debug_df[debug_df["MatchStatus"] == "No Match"]
+else:
+    filtered = debug_df
+
+# Display key columns
+st.dataframe(
+    filtered[
+        [
+            "LegacyId",
+            "Recurring Gift Transaction Id",
+            "Recurring Gift Id",
+            "MatchStatus"
+        ]
+    ],
+    use_container_width=True
+)
+
+# Download debug report
+st.download_button(
+    "Download Debug Report",
+    filtered.to_csv(index=False).encode("utf-8"),
+    "mapping_debug_report.csv"
+)
 
 # -----------------------------
 # Problem Rows
