@@ -32,7 +32,7 @@ update.columns = update.columns.str.strip()
 crm.columns = crm.columns.str.strip()
 
 # -----------------------------
-# Validate columns
+# Validate required columns
 # -----------------------------
 required_update = ["LegacyId", "Amount", "CoversCost", "Costs"]
 required_crm = ["Recurring Gift Transaction Id", "Recurring Gift Id"]
@@ -48,15 +48,14 @@ for col in required_crm:
         st.stop()
 
 # -----------------------------
-# Normalize keys
+# Normalize key fields
 # -----------------------------
 update["LegacyId"] = update["LegacyId"].astype(str).str.strip()
-
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].astype(str).str.strip()
 crm["Recurring Gift Id"] = crm["Recurring Gift Id"].astype(str).str.strip()
 
 # -----------------------------
-# 🚨 DUPLICATE DETECTION
+# Data Integrity Checks
 # -----------------------------
 dup_update = update["LegacyId"].duplicated().sum()
 dup_crm = crm["Recurring Gift Transaction Id"].duplicated().sum()
@@ -68,10 +67,10 @@ col1.metric("Duplicate LegacyIds (Update)", dup_update)
 col2.metric("Duplicate Transaction IDs (CRM)", dup_crm)
 
 if dup_update > 0:
-    st.warning("Update file contains duplicate LegacyIds — mapping may be unreliable")
+    st.warning("Duplicate LegacyIds found in Update file.")
 
 if dup_crm > 0:
-    st.warning("CRM file contains duplicate Transaction IDs — using first match only")
+    st.warning("Duplicate Transaction IDs found in CRM file (first match will be used).")
 
 # Optional: download duplicates
 dup_rows = update[update["LegacyId"].duplicated(keep=False)]
@@ -83,34 +82,25 @@ if len(dup_rows) > 0:
     )
 
 # -----------------------------
-# Build CRM lookup (SAFE)
+# Build CRM lookup
 # -----------------------------
 crm_lookup = (
     crm.drop_duplicates("Recurring Gift Transaction Id")
-    .set_index("Recurring Gift Transaction Id")
+    .set_index("Recurring Gift Transaction Id")["Recurring Gift Id"]
 )
 
 # -----------------------------
-# Map RecurringId
+# Mapping
 # -----------------------------
-update["RecurringId"] = update["LegacyId"].map(
-    crm_lookup["Recurring Gift Id"]
-)
+# RecurringId from CRM
+update["RecurringId"] = update["LegacyId"].map(crm_lookup)
 
-# -----------------------------
-# Safer NewTransactionId
-# -----------------------------
-update["MatchedTransactionId"] = update["LegacyId"].map(
-    crm_lookup.index.to_series()
-)
-
-update["NewTransactionId"] = update["MatchedTransactionId"].apply(
+# NewTransactionId with rd2- prefix
+update["NewTransactionId"] = update["LegacyId"].apply(
     lambda x: f"rd2-{x}" if pd.notna(x) else None
 )
 
-# -----------------------------
-# Transaction Source
-# -----------------------------
+# Transaction source
 update["TransactionSource"] = "RaiseDonors"
 
 # -----------------------------
@@ -150,6 +140,7 @@ missing_recurring = update["RecurringId"].isna().sum()
 missing_txn = update["NewTransactionId"].isna().sum()
 
 st.subheader("Mapping Summary")
+
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Rows", len(update))
 col2.metric("Missing RecurringId", missing_recurring)
