@@ -1,46 +1,33 @@
-import pandas as pd
-import streamlit as st
+# -----------------------------
+# CLEAN IDs FIRST (ONLY ONCE)
+# -----------------------------
+def clean(x):
+    return str(x).strip().replace(".0", "")
 
-st.title("Simple CRM Mapping Test")
+update["LegacyId"] = update["LegacyId"].apply(clean)
+crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(clean)
 
-update_file = st.file_uploader("Upload Update File", type=["csv"])
-crm_file = st.file_uploader("Upload CRM File", type=["csv"])
+# -----------------------------
+# CREATE A CLEAN MAPPING TABLE
+# -----------------------------
+crm_map = crm[[
+    "Recurring Gift Transaction Id",
+    "Recurring Gift Id"
+]].drop_duplicates()
 
-if update_file and crm_file:
+# -----------------------------
+# PERFORM MERGE (DO NOT TOUCH AFTER)
+# -----------------------------
+update = update.merge(
+    crm_map,
+    how="left",
+    left_on="LegacyId",
+    right_on="Recurring Gift Transaction Id"
+)
 
-    update = pd.read_csv(update_file, dtype=str)
-    crm = pd.read_csv(crm_file, dtype=str)
-
-    # Clean columns
-    update.columns = update.columns.str.strip()
-    crm.columns = crm.columns.str.strip()
-
-    # Normalize IDs
-    update["LegacyId"] = update["LegacyId"].astype(str).str.strip()
-    crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].astype(str).str.strip()
-
-    # SIMPLE MERGE
-    result = update.merge(
-        crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]],
-        how="left",
-        left_on="LegacyId",
-        right_on="Recurring Gift Transaction Id"
-    )
-
-    # Output ONLY what we care about
-    st.subheader("Mapping Result")
-
-    st.dataframe(
-        result[[
-            "LegacyId",
-            "Recurring Gift Transaction Id",
-            "Recurring Gift Id"
-        ]],
-        use_container_width=True
-    )
-
-    # Quick success metric
-    matches = result["Recurring Gift Id"].notna().sum()
-    total = len(result)
-
-    st.metric("Matches Found", f"{matches} / {total}")
+# -----------------------------
+# FINAL FIELD ASSIGNMENT
+# -----------------------------
+update["RecurringId"] = update["Recurring Gift Id"]
+update["NewTransactionId"] = "rd2-" + update["LegacyId"]
+update["TransactionSource"] = "RaiseDonors"
