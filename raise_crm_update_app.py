@@ -48,10 +48,13 @@ for col in required_crm:
         st.stop()
 
 # -----------------------------
-# Normalize IDs
+# Normalize IDs (IMPORTANT)
 # -----------------------------
-update["LegacyId"] = update["LegacyId"].astype(str).str.strip()
-crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].astype(str).str.strip()
+def normalize(val):
+    return str(val).strip().replace(".0", "")
+
+update["LegacyId"] = update["LegacyId"].apply(normalize)
+crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(normalize)
 crm["Recurring Gift Id"] = crm["Recurring Gift Id"].astype(str).str.strip()
 
 # -----------------------------
@@ -73,22 +76,27 @@ if dup_crm > 0:
     st.warning("Duplicate Transaction IDs found in CRM file.")
 
 # -----------------------------
-# Build CRM lookup (safe)
+# 🔥 MERGE-BASED MAPPING (FIXED)
 # -----------------------------
-crm_lookup = (
-    crm.dropna(subset=["Recurring Gift Id"])
-    .drop_duplicates(subset="Recurring Gift Transaction Id")
-    .set_index("Recurring Gift Transaction Id")["Recurring Gift Id"]
+merged = update.merge(
+    crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]],
+    how="left",
+    left_on="LegacyId",
+    right_on="Recurring Gift Transaction Id"
 )
 
-# -----------------------------
-# Mapping (core logic)
-# -----------------------------
-update["RecurringId"] = update["LegacyId"].map(crm_lookup)
-update["NewTransactionId"] = update["LegacyId"].apply(
+# Populate fields
+merged["RecurringId"] = merged["Recurring Gift Id"]
+merged["NewTransactionId"] = merged["LegacyId"].apply(
     lambda x: f"rd2-{x}" if pd.notna(x) else None
 )
-update["TransactionSource"] = "RaiseDonors"
+merged["TransactionSource"] = "RaiseDonors"
+
+# Drop helper columns
+merged = merged.drop(columns=["Recurring Gift Transaction Id", "Recurring Gift Id"])
+
+# Replace working dataframe
+update = merged
 
 # -----------------------------
 # CoversCost Logic
@@ -99,7 +107,6 @@ update["Costs"] = pd.to_numeric(update["Costs"], errors="coerce").fillna(0)
 
 mask = update["CoversCost"]
 
-# Add Costs into Amount
 update.loc[mask, "Amount"] = update.loc[mask, "Amount"] + update.loc[mask, "Costs"]
 
 # -----------------------------
@@ -124,14 +131,12 @@ update.loc[mask, amount_col] = update.loc[mask, "Costs"]
 # Summary Metrics
 # -----------------------------
 missing_recurring = update["RecurringId"].isna().sum()
-missing_txn = update["NewTransactionId"].isna().sum()
 
 st.subheader("Mapping Summary")
 
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 col1.metric("Total Rows", len(update))
 col2.metric("Missing RecurringId", missing_recurring)
-col3.metric("Missing NewTransactionId", missing_txn)
 
 # -----------------------------
 # Preview Output
@@ -146,11 +151,10 @@ csv = update.to_csv(index=False).encode("utf-8")
 st.download_button("Download Updated File", csv, "crm_updates.csv")
 
 # =========================================================
-# 🔍 MAPPING DEBUGGER PANEL
+# 🔍 DEBUGGER PANEL (UNCHANGED BUT NOW MORE POWERFUL)
 # =========================================================
 st.subheader("🔍 Mapping Debugger")
 
-# Merge for inspection
 debug_df = update.merge(
     crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]],
     how="left",
@@ -158,20 +162,14 @@ debug_df = update.merge(
     right_on="Recurring Gift Transaction Id"
 )
 
-# Match status
 debug_df["MatchStatus"] = debug_df["Recurring Gift Id"].apply(
     lambda x: "Matched" if pd.notna(x) else "No Match"
 )
 
-# Metrics
-matched_count = (debug_df["MatchStatus"] == "Matched").sum()
-unmatched_count = (debug_df["MatchStatus"] == "No Match").sum()
-
 col1, col2 = st.columns(2)
-col1.metric("Matched Rows", matched_count)
-col2.metric("Unmatched Rows", unmatched_count)
+col1.metric("Matched Rows", (debug_df["MatchStatus"] == "Matched").sum())
+col2.metric("Unmatched Rows", (debug_df["MatchStatus"] == "No Match").sum())
 
-# Filter
 status_filter = st.selectbox(
     "Filter rows",
     ["All", "Matched", "No Match"]
@@ -184,7 +182,6 @@ elif status_filter == "No Match":
 else:
     filtered = debug_df
 
-# Display key columns
 st.dataframe(
     filtered[
         [
@@ -197,7 +194,6 @@ st.dataframe(
     use_container_width=True
 )
 
-# Download debug report
 st.download_button(
     "Download Debug Report",
     filtered.to_csv(index=False).encode("utf-8"),
@@ -207,10 +203,7 @@ st.download_button(
 # -----------------------------
 # Problem Rows
 # -----------------------------
-problem_rows = update[
-    (update["RecurringId"].isna()) |
-    (update["NewTransactionId"].isna())
-]
+problem_rows = update[update["RecurringId"].isna()]
 
 if len(problem_rows) > 0:
     st.subheader("Problem Rows")
