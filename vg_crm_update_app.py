@@ -7,7 +7,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🔄 Recurring Gift Update Builder")
+st.title("VG CRM Update Builder")
 
 # -----------------------------
 # Uploads
