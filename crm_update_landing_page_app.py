@@ -8,23 +8,22 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
 html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif;
 }
 
 .stApp {
-    background: #f5f4f0;
+    background: #f0f7fb;
     background-image:
-        radial-gradient(ellipse 70% 40% at 60% 0%, rgba(190,180,255,0.25) 0%, transparent 65%),
-        radial-gradient(ellipse 40% 30% at 10% 90%, rgba(180,230,220,0.2) 0%, transparent 60%);
+        radial-gradient(ellipse 70% 40% at 55% 0%, rgba(26,140,181,0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 5% 95%, rgba(11,126,163,0.1) 0%, transparent 60%);
 }
 
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding-top: 3rem; padding-bottom: 3rem; max-width: 660px; }
 
-/* Hide all default streamlit elements inside card areas */
 .stLinkButton { display: none !important; }
 
 /* ── Hero ── */
@@ -34,9 +33,9 @@ html, body, [class*="css"] {
 }
 .hero-badge {
     display: inline-block;
-    background: rgba(99,57,255,0.08);
-    border: 1px solid rgba(99,57,255,0.18);
-    color: #6339ff;
+    background: rgba(11,126,163,0.1);
+    border: 1px solid rgba(11,126,163,0.25);
+    color: #0b7ea3;
     font-size: 0.68rem;
     font-weight: 500;
     letter-spacing: 0.12em;
@@ -49,20 +48,20 @@ html, body, [class*="css"] {
     font-family: 'Syne', sans-serif;
     font-size: 2.8rem;
     font-weight: 800;
-    color: #1a1830;
+    color: #0d2d3d;
     line-height: 1.1;
     letter-spacing: -0.03em;
     margin: 0 0 0.9rem;
 }
 .hero-title span {
-    background: linear-gradient(135deg, #6339ff 0%, #38bdf8 100%);
+    background: linear-gradient(135deg, #0b7ea3 0%, #1ab5d4 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
 }
 .hero-sub {
     font-size: 0.95rem;
-    color: #8b87a8;
+    color: #6a8fa0;
     font-weight: 300;
     margin: 0;
     line-height: 1.6;
@@ -74,7 +73,7 @@ html, body, [class*="css"] {
     font-weight: 500;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #b0adc8;
+    color: #9bbccc;
     text-align: center;
     margin: 1.8rem 0 1.1rem;
     display: flex;
@@ -85,34 +84,34 @@ html, body, [class*="css"] {
     content: '';
     flex: 1;
     height: 1px;
-    background: rgba(0,0,0,0.07);
+    background: rgba(11,126,163,0.12);
 }
 
 /* ── Cards ── */
 .tool-card {
     background: #ffffff;
-    border: 1px solid rgba(0,0,0,0.07);
+    border: 1px solid rgba(11,126,163,0.1);
     border-radius: 18px;
     padding: 1.5rem 1.6rem;
     margin-bottom: 0.85rem;
     display: flex;
     align-items: center;
     gap: 1.2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 3px rgba(11,126,163,0.05), 0 4px 16px rgba(11,126,163,0.06);
     transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
     text-decoration: none;
 }
 .tool-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 12px 32px rgba(99,57,255,0.1);
+    box-shadow: 0 2px 8px rgba(11,126,163,0.08), 0 12px 32px rgba(11,126,163,0.14);
     transform: translateY(-2px);
-    border-color: rgba(99,57,255,0.2);
+    border-color: rgba(11,126,163,0.28);
 }
 
 .card-icon {
     font-size: 1.4rem;
     width: 46px;
     height: 46px;
-    background: linear-gradient(135deg, #ede9ff 0%, #e0f2fe 100%);
+    background: linear-gradient(135deg, #dff1f8 0%, #c8eaf5 100%);
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -124,19 +123,19 @@ html, body, [class*="css"] {
     font-family: 'Syne', sans-serif;
     font-size: 0.95rem;
     font-weight: 700;
-    color: #1a1830;
+    color: #0d2d3d;
     margin: 0 0 0.25rem;
     letter-spacing: -0.01em;
 }
 .card-desc {
     font-size: 0.8rem;
-    color: #9c98b8;
+    color: #7aaabb;
     margin: 0;
     line-height: 1.5;
 }
 .card-btn {
     flex-shrink: 0;
-    background: linear-gradient(135deg, #6339ff 0%, #4f46e5 100%);
+    background: linear-gradient(135deg, #0b7ea3 0%, #1a8cb5 100%);
     color: #fff !important;
     font-family: 'DM Sans', sans-serif;
     font-size: 0.78rem;
@@ -146,12 +145,12 @@ html, body, [class*="css"] {
     border-radius: 9px;
     letter-spacing: 0.01em;
     white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(99,57,255,0.25);
+    box-shadow: 0 2px 8px rgba(11,126,163,0.3);
     transition: opacity 0.2s, box-shadow 0.2s;
 }
 .card-btn:hover {
     opacity: 0.88;
-    box-shadow: 0 4px 14px rgba(99,57,255,0.35);
+    box-shadow: 0 4px 14px rgba(11,126,163,0.4);
 }
 
 /* ── Footer ── */
@@ -159,7 +158,7 @@ html, body, [class*="css"] {
     text-align: center;
     margin-top: 2.2rem;
     font-size: 0.71rem;
-    color: #c0bdd6;
+    color: #a8c8d8;
     letter-spacing: 0.04em;
 }
 </style>
