@@ -130,34 +130,6 @@ merged = merged.drop(columns=[
 update = merged
 
 # -----------------------------
-# CoversCost Logic
-# -----------------------------
-update["CoversCost"] = update["CoversCost"].astype(str).str.lower() == "true"
-update["Amount"] = pd.to_numeric(update["Amount"], errors="coerce").fillna(0)
-update["Costs"] = pd.to_numeric(update["Costs"], errors="coerce").fillna(0)
-
-mask = update["CoversCost"]
-update.loc[mask, "Amount"] = update.loc[mask, "Amount"] + update.loc[mask, "Costs"]
-
-# -----------------------------
-# Add CREDITCARDCOSTS split
-# -----------------------------
-project_cols = [col for col in update.columns if "Project" in col and "Code" in col]
-next_index = len(project_cols) + 1
-
-code_col = f"Project{next_index}Code"
-name_col = f"Project{next_index}Name"
-amount_col = f"Project{next_index}Amount"
-
-update[code_col] = ""
-update[name_col] = ""
-update[amount_col] = ""
-
-update.loc[mask, code_col] = "CREDITCARDCOSTS"
-update.loc[mask, name_col] = "Processing Fees"
-update.loc[mask, amount_col] = update.loc[mask, "Costs"]
-
-# -----------------------------
 # Summary Metrics
 # -----------------------------
 def is_missing(series):
