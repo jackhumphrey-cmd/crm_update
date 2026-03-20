@@ -8,7 +8,7 @@ st.set_page_config(
 # Header
 # -----------------------------
 st.title("CRM Update Hub")
-st.subheader("Choose your migration workflow to get started")
+st.subheader("Choose your desired CRM Update to get started")
 st.write("")
 # -----------------------------
 # Virtuous Giving CRM Updates Card
