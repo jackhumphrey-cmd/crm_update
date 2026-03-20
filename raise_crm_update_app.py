@@ -79,8 +79,8 @@ if dup_crm > 0:
 #   "rd2-" + Update["LegacyId"]
 #
 # RecurringGiftId:
-#   Update["LegacyId"] → CRM["Recurring Gift Transaction Id"]
-#   → pull CRM["Recurring Id"] into RecurringGiftId
+#   Update["LegacyId"] -> CRM["Recurring Gift Transaction Id"]
+#   -> pull CRM["Recurring Id"] into RecurringGiftId
 #
 # TransactionSource:
 #   Always set to "RaiseDonors"
@@ -89,7 +89,7 @@ if dup_crm > 0:
 # Step 1: NewTransactionId = "rd2-" + LegacyId
 update["NewTransactionId"] = "rd2-" + update["LegacyId"]
 
-# Step 2: Join → CRM on LegacyId = CRM Recurring Gift Transaction Id
+# Step 2: Join -> CRM on LegacyId = CRM Recurring Gift Transaction Id
 crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Id"]].rename(columns={
     "Recurring Id": "CRM_RecurringId"
 })
@@ -109,42 +109,56 @@ update["TransactionSource"] = "RaiseDonors"
 # CoversCost Project Split
 #
 # For rows where CoversCost == "True":
-#   - Add Costs to Amount on original row
-#   - Append a new split row with:
-#       ProjectCode    = "CREDITCARDCOSTS"
-#       ProjectName    = "Processing Fees"
-#       ProjectAmount  = Costs value
+#   - Add Costs to Amount on the original row
+#   - Find the next available ProjectN slot (Code/Name/Amount all blank)
+#     and fill in CREDITCARDCOSTS / Processing Fees / Costs value
 # -----------------------------
 
 def is_covers_cost(val):
     return str(val).strip().lower() == "true"
 
-split_rows = []
+def is_blank(val):
+    return pd.isna(val) or str(val).strip() == "" or str(val).strip().lower() == "nan"
 
-for _, row in update.iterrows():
+def find_next_project_slot(row, columns):
+    """Return the lowest N where ProjectNCode, ProjectNName, ProjectNAmount are all blank."""
+    i = 1
+    while True:
+        code_col = f"Project{i}Code"
+        name_col = f"Project{i}Name"
+        amt_col  = f"Project{i}Amount"
+        # If none of these columns exist in the file, there are no more slots
+        if code_col not in columns and name_col not in columns and amt_col not in columns:
+            return None
+        if is_blank(row.get(code_col, "")) and is_blank(row.get(name_col, "")) and is_blank(row.get(amt_col, "")):
+            return i
+        i += 1
+
+output = update.copy()
+covers_cost_count = 0
+
+for idx, row in output.iterrows():
     if is_covers_cost(row.get("CoversCost", "")):
+        # Add Costs to Amount on original row
         try:
             amount = float(row["Amount"])
-            costs = float(row["Costs"])
-            row["Amount"] = str(round(amount + costs, 2))
+            costs  = float(row["Costs"])
+            output.at[idx, "Amount"] = str(round(amount + costs, 2))
         except (ValueError, TypeError):
             pass
 
-        split_row = row.copy()
-        split_row["ProjectCode"] = "CREDITCARDCOSTS"
-        split_row["ProjectName"] = "Processing Fees"
-        split_row["ProjectAmount"] = row["Costs"]
-        split_rows.append(split_row)
-
-# Rebuild update with modified amounts, then append split rows
-if split_rows:
-    split_df = pd.DataFrame(split_rows)
-    output = pd.concat([update, split_df], ignore_index=True)
-else:
-    output = update.copy()
-
-# Sort so split rows appear directly below their parent row
-output = output.sort_values(by="TransactionId", kind="stable").reset_index(drop=True)
+        # Find next available project slot and write split values in-place
+        slot = find_next_project_slot(row, output.columns.tolist())
+        if slot is not None:
+            output.at[idx, f"Project{slot}Code"]   = "CREDITCARDCOSTS"
+            output.at[idx, f"Project{slot}Name"]   = "Processing Fees"
+            output.at[idx, f"Project{slot}Amount"] = row["Costs"]
+            covers_cost_count += 1
+        else:
+            st.warning(
+                f"Row {idx} (TransactionId: {row.get('TransactionId', '')}) "
+                f"has no available project slot for the CoversCost split."
+            )
 
 # -----------------------------
 # Summary Metrics
@@ -152,17 +166,16 @@ output = output.sort_values(by="TransactionId", kind="stable").reset_index(drop=
 def is_missing(series):
     return series.isna() | (series.astype(str).str.lower() == "nan")
 
-missing_recurring_gift = is_missing(output["RecurringGiftId"]).sum()
+missing_recurring_gift  = is_missing(output["RecurringGiftId"]).sum()
 missing_new_transaction = is_missing(output["NewTransactionId"]).sum()
-covers_cost_count = update["CoversCost"].apply(is_covers_cost).sum()
 
 st.subheader("Mapping Summary")
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Rows (incl. splits)", len(output))
+col1.metric("Total Rows", len(output))
 col2.metric("Missing RecurringGiftId", missing_recurring_gift)
 col3.metric("Missing NewTransactionId", missing_new_transaction)
-col4.metric("CoversCost Split Rows Added", len(split_rows))
+col4.metric("CoversCost Splits Applied", covers_cost_count)
 
 # -----------------------------
 # Preview Output
@@ -177,13 +190,13 @@ csv = output.to_csv(index=False).encode("utf-8")
 st.download_button("Download Updated File", csv, "crm_updates_v2.csv")
 
 # =========================================================
-# 🔍 DEBUGGER PANEL
+# DEBUGGER PANEL
 # =========================================================
 st.subheader("🔍 Mapping Debugger")
 
 debug_df = output[["TransactionId", "LegacyId", "NewTransactionId", "RecurringGiftId", "TransactionSource"]].copy()
 
-debug_df["Schedule Match"] = debug_df["NewTransactionId"].apply(
+debug_df["NewTxn Match"] = debug_df["NewTransactionId"].apply(
     lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
 )
 debug_df["CRM Match"] = debug_df["RecurringGiftId"].apply(
@@ -191,9 +204,9 @@ debug_df["CRM Match"] = debug_df["RecurringGiftId"].apply(
 )
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("NewTransactionId Matched", (debug_df["Schedule Match"] == "✅").sum())
-col2.metric("NewTransactionId Missing", (debug_df["Schedule Match"] == "❌").sum())
-col3.metric("CRM Matched", (debug_df["CRM Match"] == "✅").sum())
+col1.metric("NewTransactionId Matched", (debug_df["NewTxn Match"] == "✅").sum())
+col2.metric("NewTransactionId Missing",  (debug_df["NewTxn Match"] == "❌").sum())
+col3.metric("CRM Matched",   (debug_df["CRM Match"] == "✅").sum())
 col4.metric("CRM Unmatched", (debug_df["CRM Match"] == "❌").sum())
 
 status_filter = st.selectbox(
@@ -202,9 +215,9 @@ status_filter = st.selectbox(
 )
 
 if status_filter == "NewTransactionId Matched":
-    filtered = debug_df[debug_df["Schedule Match"] == "✅"]
+    filtered = debug_df[debug_df["NewTxn Match"] == "✅"]
 elif status_filter == "NewTransactionId Missing":
-    filtered = debug_df[debug_df["Schedule Match"] == "❌"]
+    filtered = debug_df[debug_df["NewTxn Match"] == "❌"]
 elif status_filter == "CRM Matched":
     filtered = debug_df[debug_df["CRM Match"] == "✅"]
 elif status_filter == "CRM Unmatched":
