@@ -34,7 +34,7 @@ schedule.columns = schedule.columns.str.strip()
 # -----------------------------
 # Validate required columns
 # -----------------------------
-required_update = ["TransactionId", "Amount", "Costs"]
+required_update = ["TransactionId", "LegacyId", "Amount", "Costs"]
 required_crm = ["Recurring Gift Transaction Id", "Recurring Id"]
 required_schedule = ["Recurring Id", "LegacyId"]
 
@@ -60,6 +60,7 @@ def normalize(val):
     return str(val).strip().replace(".0", "") if pd.notna(val) else val
 
 update["TransactionId"] = update["TransactionId"].apply(normalize)
+update["LegacyId"] = update["LegacyId"].apply(normalize)
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(normalize)
 crm["Recurring Id"] = crm["Recurring Id"].apply(normalize)
 schedule["Recurring Id"] = schedule["Recurring Id"].apply(normalize)
@@ -90,25 +91,24 @@ if dup_schedule > 0:
 # MAPPING
 #
 # NewTransactionId:
-#   Update["TransactionId"] → Schedule["Recurring Id"] (UUID match)
+#   Update["LegacyId"] → Schedule["LegacyId"]
 #   → pull Schedule["Recurring Id"] into NewTransactionId
 #
 # RecurringGiftId:
-#   Update["TransactionId"] → Schedule["Recurring Id"] → get Schedule["LegacyId"]
+#   Update["LegacyId"] → Schedule["LegacyId"] → get Schedule["LegacyId"]
 #   → Schedule["LegacyId"] → CRM["Recurring Gift Transaction Id"]
 #   → pull CRM["Recurring Id"] into RecurringGiftId
 # -----------------------------
 
-# Step 1: Join Update → Schedule on UUID
-# Rename schedule cols to avoid collision with update's own LegacyId column
-sched_slim = schedule[["Recurring Id", "LegacyId"]].rename(columns={
-    "Recurring Id": "Sched_RecurringId",
-    "LegacyId": "Sched_LegacyId"
+# Step 1: Join Update → Schedule on LegacyId to get NewTransactionId
+sched_slim = schedule[["LegacyId", "Recurring Id"]].rename(columns={
+    "LegacyId": "Sched_LegacyId",
+    "Recurring Id": "Sched_RecurringId"
 })
 
-merged = update.merge(sched_slim, how="left", left_on="TransactionId", right_on="Sched_RecurringId")
+merged = update.merge(sched_slim, how="left", left_on="LegacyId", right_on="Sched_LegacyId")
 
-# NewTransactionId comes directly from Schedule["Recurring Id"] (the UUID)
+# NewTransactionId comes from Schedule["Recurring Id"]
 merged["NewTransactionId"] = merged["Sched_RecurringId"]
 
 # Step 2: Join → CRM on Sched_LegacyId = CRM Recurring Gift Transaction Id
@@ -123,7 +123,7 @@ merged["RecurringGiftId"] = merged["CRM_RecurringId"]
 
 # Drop helper columns
 merged = merged.drop(columns=[
-    "Sched_RecurringId", "Sched_LegacyId",
+    "Sched_LegacyId", "Sched_RecurringId",
     "Recurring Gift Transaction Id", "CRM_RecurringId"
 ], errors="ignore")
 
@@ -162,7 +162,7 @@ st.download_button("Download Updated File", csv, "crm_updates.csv")
 # =========================================================
 st.subheader("🔍 Mapping Debugger")
 
-debug_df = update[["TransactionId", "NewTransactionId", "RecurringGiftId"]].copy()
+debug_df = update[["TransactionId", "LegacyId", "NewTransactionId", "RecurringGiftId"]].copy()
 
 debug_df["Schedule Match"] = debug_df["NewTransactionId"].apply(
     lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
