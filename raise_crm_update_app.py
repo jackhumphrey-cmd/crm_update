@@ -7,7 +7,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🔄 CRM Update Builder v2")
+st.title("LRD -> Virtuous Raise CRM Updater")
 
 # -----------------------------
 # Uploads
