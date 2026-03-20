@@ -27,9 +27,6 @@ update = pd.read_csv(update_file, dtype=str)
 crm = pd.read_csv(crm_file, dtype=str)
 schedule = pd.read_csv(schedule_file, dtype=str)
 
-# -----------------------------
-# Normalize columns
-# -----------------------------
 update.columns = update.columns.str.strip()
 crm.columns = crm.columns.str.strip()
 schedule.columns = schedule.columns.str.strip()
@@ -37,9 +34,9 @@ schedule.columns = schedule.columns.str.strip()
 # -----------------------------
 # Validate required columns
 # -----------------------------
-required_update = ["LegacyId", "Amount", "CoversCost", "Costs"]
-required_crm = ["Recurring Gift Transaction Id", "Recurring Gift Id"]
-required_schedule = ["LegacyId", "Recurring Id"]
+required_update = ["TransactionId", "Amount", "CoversCost", "Costs"]
+required_crm = ["Recurring Gift Transaction Id", "Recurring Id"]
+required_schedule = ["Recurring Id", "LegacyId"]
 
 for col in required_update:
     if col not in update.columns:
@@ -60,66 +57,77 @@ for col in required_schedule:
 # Normalize IDs
 # -----------------------------
 def normalize(val):
-    return str(val).strip().replace(".0", "")
+    return str(val).strip().replace(".0", "") if pd.notna(val) else val
 
-update["LegacyId"] = update["LegacyId"].apply(normalize)
+update["TransactionId"] = update["TransactionId"].apply(normalize)
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(normalize)
-crm["Recurring Gift Id"] = crm["Recurring Gift Id"].astype(str).str.strip()
+crm["Recurring Id"] = crm["Recurring Id"].apply(normalize)
+schedule["Recurring Id"] = schedule["Recurring Id"].apply(normalize)
 schedule["LegacyId"] = schedule["LegacyId"].apply(normalize)
-schedule["Recurring Id"] = schedule["Recurring Id"].astype(str).str.strip()
 
 # -----------------------------
 # Data Integrity Checks
 # -----------------------------
-dup_update = update["LegacyId"].duplicated().sum()
+dup_update = update["TransactionId"].duplicated().sum()
 dup_crm = crm["Recurring Gift Transaction Id"].duplicated().sum()
-dup_schedule = schedule["LegacyId"].duplicated().sum()
+dup_schedule = schedule["Recurring Id"].duplicated().sum()
 
 st.subheader("Data Integrity Checks")
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Duplicate LegacyIds (Update)", dup_update)
+col1.metric("Duplicate TransactionIds (Update)", dup_update)
 col2.metric("Duplicate Transaction IDs (CRM)", dup_crm)
-col3.metric("Duplicate LegacyIds (Schedule)", dup_schedule)
+col3.metric("Duplicate Recurring Ids (Schedule)", dup_schedule)
 
 if dup_update > 0:
-    st.warning("Duplicate LegacyIds found in Update file.")
+    st.warning("Duplicate TransactionIds found in Update file.")
 if dup_crm > 0:
     st.warning("Duplicate Transaction IDs found in CRM file.")
 if dup_schedule > 0:
-    st.warning("Duplicate LegacyIds found in Schedule file.")
+    st.warning("Duplicate Recurring Ids found in Schedule file.")
 
 # -----------------------------
 # MAPPING
 #
-# Join 1: Update["LegacyId"] → CRM["Recurring Gift Transaction Id"]
-#         → fills RecurringGiftId from CRM["Recurring Gift Id"]
+# NewTransactionId:
+#   Update["TransactionId"] → Schedule["Recurring Id"] (UUID match)
+#   → pull Schedule["Recurring Id"] into NewTransactionId
 #
-# Join 2: Update["LegacyId"] → Schedule["LegacyId"]
-#         → fills NewTransactionId from Schedule["Recurring Id"]
+# RecurringGiftId:
+#   Update["TransactionId"] → Schedule["Recurring Id"] → get Schedule["LegacyId"]
+#   → Schedule["LegacyId"] → CRM["Recurring Gift Transaction Id"]
+#   → pull CRM["Recurring Id"] into RecurringGiftId
 # -----------------------------
 
-# Join 1: CRM mapping
-merged = update.merge(
-    crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]],
-    how="left",
-    left_on="LegacyId",
-    right_on="Recurring Gift Transaction Id"
-)
-merged["RecurringGiftId"] = merged["Recurring Gift Id"]
-merged = merged.drop(columns=["Recurring Gift Transaction Id", "Recurring Gift Id"])
+# Step 1: Join Update → Schedule on UUID
+# Rename schedule cols to avoid collision with update's own LegacyId column
+sched_slim = schedule[["Recurring Id", "LegacyId"]].rename(columns={
+    "Recurring Id": "Sched_RecurringId",
+    "LegacyId": "Sched_LegacyId"
+})
 
-# Join 2: Schedule mapping
-merged = merged.merge(
-    schedule[["LegacyId", "Recurring Id"]],
-    how="left",
-    on="LegacyId",
-    suffixes=("", "_schedule")
-)
-merged["NewTransactionId"] = merged["Recurring Id"]
-merged = merged.drop(columns=["Recurring Id"])
+merged = update.merge(sched_slim, how="left", left_on="TransactionId", right_on="Sched_RecurringId")
+
+# NewTransactionId comes directly from Schedule["Recurring Id"] (the UUID)
+merged["NewTransactionId"] = merged["Sched_RecurringId"]
+
+# Step 2: Join → CRM on Sched_LegacyId = CRM Recurring Gift Transaction Id
+crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Id"]].rename(columns={
+    "Recurring Id": "CRM_RecurringId"
+})
+
+merged = merged.merge(crm_slim, how="left", left_on="Sched_LegacyId", right_on="Recurring Gift Transaction Id")
+
+# RecurringGiftId comes from CRM["Recurring Id"]
+merged["RecurringGiftId"] = merged["CRM_RecurringId"]
 
 merged["TransactionSource"] = "RaiseDonors"
+
+# Drop helper columns
+merged = merged.drop(columns=[
+    "Sched_RecurringId", "Sched_LegacyId",
+    "Recurring Gift Transaction Id", "CRM_RecurringId"
+], errors="ignore")
 
 update = merged
 
@@ -154,8 +162,11 @@ update.loc[mask, amount_col] = update.loc[mask, "Costs"]
 # -----------------------------
 # Summary Metrics
 # -----------------------------
-missing_recurring_gift = update["RecurringGiftId"].isna().sum()
-missing_new_transaction = update["NewTransactionId"].isna().sum()
+def is_missing(series):
+    return series.isna() | (series.astype(str).str.lower() == "nan")
+
+missing_recurring_gift = is_missing(update["RecurringGiftId"]).sum()
+missing_new_transaction = is_missing(update["NewTransactionId"]).sum()
 
 st.subheader("Mapping Summary")
 
@@ -181,69 +192,38 @@ st.download_button("Download Updated File", csv, "crm_updates.csv")
 # =========================================================
 st.subheader("🔍 Mapping Debugger")
 
-debug_df = update[["LegacyId", "RecurringGiftId", "NewTransactionId"]].copy()
+debug_df = update[["TransactionId", "NewTransactionId", "RecurringGiftId"]].copy()
 
-# Re-join CRM for debug visibility
-debug_df = debug_df.merge(
-    crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]],
-    how="left",
-    left_on="LegacyId",
-    right_on="Recurring Gift Transaction Id"
-)
-
-# Re-join Schedule for debug visibility
-debug_df = debug_df.merge(
-    schedule[["LegacyId", "Recurring Id"]],
-    how="left",
-    on="LegacyId"
-)
-
-debug_df["CRM Match"] = debug_df["RecurringGiftId"].apply(
-    lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
-)
 debug_df["Schedule Match"] = debug_df["NewTransactionId"].apply(
     lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
 )
-
-crm_matched = (debug_df["CRM Match"] == "✅").sum()
-crm_unmatched = (debug_df["CRM Match"] == "❌").sum()
-sched_matched = (debug_df["Schedule Match"] == "✅").sum()
-sched_unmatched = (debug_df["Schedule Match"] == "❌").sum()
+debug_df["CRM Match"] = debug_df["RecurringGiftId"].apply(
+    lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
+)
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("CRM Matched", crm_matched)
-col2.metric("CRM Unmatched", crm_unmatched)
-col3.metric("Schedule Matched", sched_matched)
-col4.metric("Schedule Unmatched", sched_unmatched)
+col1.metric("Schedule Matched", (debug_df["Schedule Match"] == "✅").sum())
+col2.metric("Schedule Unmatched", (debug_df["Schedule Match"] == "❌").sum())
+col3.metric("CRM Matched", (debug_df["CRM Match"] == "✅").sum())
+col4.metric("CRM Unmatched", (debug_df["CRM Match"] == "❌").sum())
 
 status_filter = st.selectbox(
     "Filter rows",
-    ["All", "CRM Matched", "CRM Unmatched", "Schedule Matched", "Schedule Unmatched"]
+    ["All", "Schedule Matched", "Schedule Unmatched", "CRM Matched", "CRM Unmatched"]
 )
 
-if status_filter == "CRM Matched":
-    filtered = debug_df[debug_df["CRM Match"] == "✅"]
-elif status_filter == "CRM Unmatched":
-    filtered = debug_df[debug_df["CRM Match"] == "❌"]
-elif status_filter == "Schedule Matched":
+if status_filter == "Schedule Matched":
     filtered = debug_df[debug_df["Schedule Match"] == "✅"]
 elif status_filter == "Schedule Unmatched":
     filtered = debug_df[debug_df["Schedule Match"] == "❌"]
+elif status_filter == "CRM Matched":
+    filtered = debug_df[debug_df["CRM Match"] == "✅"]
+elif status_filter == "CRM Unmatched":
+    filtered = debug_df[debug_df["CRM Match"] == "❌"]
 else:
     filtered = debug_df
 
-st.dataframe(
-    filtered[[
-        "LegacyId",
-        "Recurring Gift Transaction Id",
-        "RecurringGiftId",
-        "CRM Match",
-        "Recurring Id",
-        "NewTransactionId",
-        "Schedule Match",
-    ]],
-    use_container_width=True
-)
+st.dataframe(filtered, use_container_width=True)
 
 st.download_button(
     "Download Debug Report",
@@ -254,10 +234,9 @@ st.download_button(
 # -----------------------------
 # Problem Rows
 # -----------------------------
-def is_missing(series):
-    return series.isna() | (series.astype(str).str.lower() == "nan")
-
-problem_rows = update[is_missing(update["RecurringGiftId"]) | is_missing(update["NewTransactionId"])]
+problem_rows = update[
+    is_missing(update["RecurringGiftId"]) | is_missing(update["NewTransactionId"])
+]
 
 if len(problem_rows) > 0:
     st.subheader("Problem Rows")
