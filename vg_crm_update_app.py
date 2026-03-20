@@ -34,7 +34,7 @@ schedule.columns = schedule.columns.str.strip()
 # -----------------------------
 # Validate required columns
 # -----------------------------
-required_update = ["TransactionId", "Amount", "CoversCost", "Costs"]
+required_update = ["TransactionId", "Amount", "Costs"]
 required_crm = ["Recurring Gift Transaction Id", "Recurring Id"]
 required_schedule = ["Recurring Id", "LegacyId"]
 
