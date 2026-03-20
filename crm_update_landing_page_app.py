@@ -17,7 +17,7 @@ with st.container(border=True):
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown("### Virtuous Giving CRM Updates")
-        st.write("Build and export CRM update files for Virtuous Giving.")
+        st.write("Build and export CRM update files for Virtuous Giving migrations.")
     with col2:
         st.write("")
         st.write("")
