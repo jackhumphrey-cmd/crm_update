@@ -121,8 +121,6 @@ merged = merged.merge(crm_slim, how="left", left_on="Sched_LegacyId", right_on="
 # RecurringGiftId comes from CRM["Recurring Id"]
 merged["RecurringGiftId"] = merged["CRM_RecurringId"]
 
-merged["TransactionSource"] = "RaiseDonors"
-
 # Drop helper columns
 merged = merged.drop(columns=[
     "Sched_RecurringId", "Sched_LegacyId",
