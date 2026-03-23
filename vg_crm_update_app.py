@@ -7,7 +7,176 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🔄 CRM Update Builder")
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+}
+
+.stApp {
+    background: #f0f7fb;
+    background-image:
+        radial-gradient(ellipse 70% 40% at 55% 0%, rgba(26,140,181,0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 5% 95%, rgba(11,126,163,0.1) 0%, transparent 60%);
+}
+
+#MainMenu, footer, header { visibility: hidden; }
+
+/* ── Page header ── */
+.page-header { padding: 1.8rem 0 0.5rem; }
+.page-badge {
+    display: inline-block;
+    background: rgba(11,126,163,0.1);
+    border: 1px solid rgba(11,126,163,0.25);
+    color: #0b7ea3;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    margin-bottom: 0.9rem;
+}
+.page-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0d2d3d;
+    letter-spacing: -0.03em;
+    margin: 0 0 0.4rem;
+    line-height: 1.15;
+}
+.page-title span {
+    background: linear-gradient(135deg, #0b7ea3 0%, #1ab5d4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.page-sub {
+    font-size: 0.88rem;
+    color: #6a8fa0;
+    font-weight: 300;
+    margin: 0 0 1.5rem;
+}
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: #ffffff !important;
+    border-right: 1px solid rgba(11,126,163,0.1) !important;
+}
+[data-testid="stSidebar"] .stMarkdown h2,
+[data-testid="stSidebar"] .stMarkdown p {
+    color: #0d2d3d !important;
+}
+[data-testid="stSidebarHeader"] { display: none; }
+
+/* ── File uploaders ── */
+[data-testid="stFileUploader"] {
+    border: 1px solid rgba(11,126,163,0.2) !important;
+    border-radius: 12px !important;
+    padding: 0.5rem 0.75rem !important;
+    background: rgba(240,247,251,0.6) !important;
+}
+[data-testid="stFileUploader"]:hover {
+    border-color: rgba(11,126,163,0.4) !important;
+}
+
+/* ── Metrics ── */
+[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid rgba(11,126,163,0.1);
+    border-radius: 14px;
+    padding: 1.4rem 1.6rem !important;
+    box-shadow: 0 1px 3px rgba(11,126,163,0.05), 0 4px 12px rgba(11,126,163,0.06);
+}
+[data-testid="stMetricLabel"] {
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.68rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase !important;
+    color: #7aaabb !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    line-height: 1.35 !important;
+    margin-bottom: 0.4rem !important;
+}
+[data-testid="stMetricValue"] {
+    font-family: 'Syne', sans-serif !important;
+    font-size: 1.4rem !important;
+    font-weight: 700 !important;
+    color: #0d2d3d !important;
+}
+
+/* ── Section headings ── */
+h2, h3 {
+    font-family: 'Syne', sans-serif !important;
+    color: #0d2d3d !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* ── Alerts ── */
+[data-testid="stAlert"] {
+    border-radius: 12px !important;
+    border-left-color: #0b7ea3 !important;
+}
+
+/* ── Buttons ── */
+.stDownloadButton button, .stButton button {
+    background: linear-gradient(135deg, #0b7ea3 0%, #1a8cb5 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 9px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    padding: 0.5rem 1.2rem !important;
+    box-shadow: 0 2px 8px rgba(11,126,163,0.28) !important;
+    transition: opacity 0.2s !important;
+}
+.stDownloadButton button:hover, .stButton button:hover {
+    opacity: 0.88 !important;
+    box-shadow: 0 4px 14px rgba(11,126,163,0.38) !important;
+}
+
+/* ── Selectbox ── */
+[data-testid="stSelectbox"] > div > div {
+    border-color: rgba(11,126,163,0.25) !important;
+    border-radius: 9px !important;
+}
+
+/* ── Dataframe ── */
+[data-testid="stDataFrame"] {
+    border-radius: 14px !important;
+    overflow: hidden;
+    border: 1px solid rgba(11,126,163,0.1) !important;
+    box-shadow: 0 1px 3px rgba(11,126,163,0.04) !important;
+}
+
+/* ── Spinner ── */
+.stSpinner > div { border-top-color: #0b7ea3 !important; }
+
+/* ── Footer ── */
+.hub-footer {
+    text-align: center;
+    margin-top: 2.5rem;
+    font-size: 0.71rem;
+    color: #a8c8d8;
+    letter-spacing: 0.04em;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="page-header">
+    <div class="page-badge">LRD Internal Tools</div>
+    <h1 class="page-title">Virtuous Giving <span>CRM Update Builder</span></h1>
+    <p class="page-sub">Map and export CRM update files for Virtuous Giving migrations.</p>
+</div>
+""", unsafe_allow_html=True)
 
 # -----------------------------
 # Uploads
@@ -89,15 +258,6 @@ if dup_schedule > 0:
 
 # -----------------------------
 # MAPPING
-#
-# NewTransactionId:
-#   Update["LegacyId"] → Schedule["LegacyId"]
-#   → pull Schedule["Recurring Id"] into NewTransactionId
-#
-# RecurringGiftId:
-#   Update["LegacyId"] → Schedule["LegacyId"] → get Schedule["LegacyId"]
-#   → Schedule["LegacyId"] → CRM["Recurring Gift Transaction Id"]
-#   → pull CRM["Recurring Id"] into RecurringGiftId
 # -----------------------------
 
 # Step 1: Join Update → Schedule on LegacyId to get NewTransactionId
@@ -158,7 +318,7 @@ csv = update.to_csv(index=False).encode("utf-8")
 st.download_button("Download Updated File", csv, "crm_updates.csv")
 
 # =========================================================
-# 🔍 DEBUGGER PANEL
+# DEBUGGER PANEL
 # =========================================================
 st.subheader("🔍 Mapping Debugger")
 
@@ -216,3 +376,9 @@ if len(problem_rows) > 0:
         problem_rows.to_csv(index=False).encode("utf-8"),
         "problem_rows.csv"
     )
+
+st.markdown("""
+<div class="hub-footer">
+    Built for efficient recurring data migrations &nbsp;·&nbsp; LRD Tools
+</div>
+""", unsafe_allow_html=True)
