@@ -7,7 +7,176 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🔄 CRM Update Builder v2")
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+}
+
+.stApp {
+    background: #f0f7fb;
+    background-image:
+        radial-gradient(ellipse 70% 40% at 55% 0%, rgba(26,140,181,0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 5% 95%, rgba(11,126,163,0.1) 0%, transparent 60%);
+}
+
+#MainMenu, footer, header { visibility: hidden; }
+
+/* ── Page header ── */
+.page-header { padding: 1.8rem 0 0.5rem; }
+.page-badge {
+    display: inline-block;
+    background: rgba(11,126,163,0.1);
+    border: 1px solid rgba(11,126,163,0.25);
+    color: #0b7ea3;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    margin-bottom: 0.9rem;
+}
+.page-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0d2d3d;
+    letter-spacing: -0.03em;
+    margin: 0 0 0.4rem;
+    line-height: 1.15;
+}
+.page-title span {
+    background: linear-gradient(135deg, #0b7ea3 0%, #1ab5d4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.page-sub {
+    font-size: 0.88rem;
+    color: #6a8fa0;
+    font-weight: 300;
+    margin: 0 0 1.5rem;
+}
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: #ffffff !important;
+    border-right: 1px solid rgba(11,126,163,0.1) !important;
+}
+[data-testid="stSidebar"] .stMarkdown h2,
+[data-testid="stSidebar"] .stMarkdown p {
+    color: #0d2d3d !important;
+}
+[data-testid="stSidebarHeader"] { display: none; }
+
+/* ── File uploaders ── */
+[data-testid="stFileUploader"] {
+    border: 1px solid rgba(11,126,163,0.2) !important;
+    border-radius: 12px !important;
+    padding: 0.5rem 0.75rem !important;
+    background: rgba(240,247,251,0.6) !important;
+}
+[data-testid="stFileUploader"]:hover {
+    border-color: rgba(11,126,163,0.4) !important;
+}
+
+/* ── Metrics ── */
+[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid rgba(11,126,163,0.1);
+    border-radius: 14px;
+    padding: 1.4rem 1.6rem !important;
+    box-shadow: 0 1px 3px rgba(11,126,163,0.05), 0 4px 12px rgba(11,126,163,0.06);
+}
+[data-testid="stMetricLabel"] {
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.68rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase !important;
+    color: #7aaabb !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    line-height: 1.35 !important;
+    margin-bottom: 0.4rem !important;
+}
+[data-testid="stMetricValue"] {
+    font-family: 'Syne', sans-serif !important;
+    font-size: 1.4rem !important;
+    font-weight: 700 !important;
+    color: #0d2d3d !important;
+}
+
+/* ── Section headings ── */
+h2, h3 {
+    font-family: 'Syne', sans-serif !important;
+    color: #0d2d3d !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* ── Alerts ── */
+[data-testid="stAlert"] {
+    border-radius: 12px !important;
+    border-left-color: #0b7ea3 !important;
+}
+
+/* ── Buttons ── */
+.stDownloadButton button, .stButton button {
+    background: linear-gradient(135deg, #0b7ea3 0%, #1a8cb5 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 9px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    padding: 0.5rem 1.2rem !important;
+    box-shadow: 0 2px 8px rgba(11,126,163,0.28) !important;
+    transition: opacity 0.2s !important;
+}
+.stDownloadButton button:hover, .stButton button:hover {
+    opacity: 0.88 !important;
+    box-shadow: 0 4px 14px rgba(11,126,163,0.38) !important;
+}
+
+/* ── Selectbox ── */
+[data-testid="stSelectbox"] > div > div {
+    border-color: rgba(11,126,163,0.25) !important;
+    border-radius: 9px !important;
+}
+
+/* ── Dataframe ── */
+[data-testid="stDataFrame"] {
+    border-radius: 14px !important;
+    overflow: hidden;
+    border: 1px solid rgba(11,126,163,0.1) !important;
+    box-shadow: 0 1px 3px rgba(11,126,163,0.04) !important;
+}
+
+/* ── Spinner ── */
+.stSpinner > div { border-top-color: #0b7ea3 !important; }
+
+/* ── Footer ── */
+.hub-footer {
+    text-align: center;
+    margin-top: 2.5rem;
+    font-size: 0.71rem;
+    color: #a8c8d8;
+    letter-spacing: 0.04em;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="page-header">
+    <div class="page-badge">LRD Internal Tools</div>
+    <h1 class="page-title">CRM <span>Update Builder v2</span></h1>
+    <p class="page-sub">Map and export CRM update files with project split support.</p>
+</div>
+""", unsafe_allow_html=True)
 
 # -----------------------------
 # Uploads
@@ -51,7 +220,7 @@ def normalize(val):
     return str(val).strip().replace(".0", "") if pd.notna(val) else val
 
 update["TransactionId"] = update["TransactionId"].apply(normalize)
-update["LegacyId"] = update["LegacyId"].apply(normalize)
+update["LegacyId"] = update["LegacyId"].fillna("").astype(str).str.strip()
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(normalize)
 crm["Recurring Gift Id"] = crm["Recurring Gift Id"].apply(normalize)
 
@@ -73,24 +242,19 @@ if dup_crm > 0:
     st.warning("Duplicate Transaction IDs found in CRM file.")
 
 # -----------------------------
+# DEDUP before merging to prevent row multiplication
+# -----------------------------
+crm_deduped = crm.drop_duplicates(subset=["Recurring Gift Transaction Id"], keep="first")
+
+# -----------------------------
 # MAPPING
-#
-# NewTransactionId:
-#   "rd2-" + Update["LegacyId"]
-#
-# RecurringGiftId:
-#   Update["LegacyId"] -> CRM["Recurring Gift Transaction Id"]
-#   -> pull CRM["Recurring Gift Id"] into RecurringGiftId
-#
-# TransactionSource:
-#   Always set to "RaiseDonors"
 # -----------------------------
 
 # Step 1: NewTransactionId = "rd2-" + LegacyId
 update["NewTransactionId"] = "rd2-" + update["LegacyId"]
 
 # Step 2: Join -> CRM on LegacyId = CRM Recurring Gift Transaction Id
-crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]].rename(columns={
+crm_slim = crm_deduped[["Recurring Gift Transaction Id", "Recurring Gift Id"]].rename(columns={
     "Recurring Gift Id": "CRM_RecurringId"
 })
 
@@ -107,11 +271,6 @@ update["TransactionSource"] = "RaiseDonors"
 
 # -----------------------------
 # CoversCost Project Split
-#
-# For rows where CoversCost == "True":
-#   - Add Costs to Amount on the original row
-#   - Find the next available ProjectN slot (Code/Name/Amount all blank)
-#     and fill in CREDITCARDCOSTS / Processing Fees / Costs value
 # -----------------------------
 
 def is_covers_cost(val):
@@ -121,13 +280,11 @@ def is_blank(val):
     return pd.isna(val) or str(val).strip() == "" or str(val).strip().lower() == "nan"
 
 def find_next_project_slot(row, columns):
-    """Return the lowest N where ProjectNCode, ProjectNName, ProjectNAmount are all blank."""
     i = 1
     while True:
         code_col = f"Project{i}Code"
         name_col = f"Project{i}Name"
         amt_col  = f"Project{i}Amount"
-        # If none of these columns exist in the file, there are no more slots
         if code_col not in columns and name_col not in columns and amt_col not in columns:
             return None
         if is_blank(row.get(code_col, "")) and is_blank(row.get(name_col, "")) and is_blank(row.get(amt_col, "")):
@@ -139,7 +296,6 @@ covers_cost_count = 0
 
 for idx, row in output.iterrows():
     if is_covers_cost(row.get("CoversCost", "")):
-        # Add Costs to Amount on original row
         try:
             amount = float(row["Amount"])
             costs  = float(row["Costs"])
@@ -147,7 +303,6 @@ for idx, row in output.iterrows():
         except (ValueError, TypeError):
             pass
 
-        # Find next available project slot and write split values in-place
         slot = find_next_project_slot(row, output.columns.tolist())
         if slot is not None:
             output.at[idx, f"Project{slot}Code"]   = "CREDITCARDCOSTS"
@@ -197,7 +352,7 @@ st.subheader("🔍 Mapping Debugger")
 debug_df = output[["TransactionId", "LegacyId", "NewTransactionId", "RecurringGiftId", "TransactionSource"]].copy()
 
 debug_df["NewTxn Match"] = debug_df["NewTransactionId"].apply(
-    lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
+    lambda x: "✅" if pd.notna(x) and str(x).lower() not in ("nan", "rd2-", "") else "❌"
 )
 debug_df["CRM Match"] = debug_df["RecurringGiftId"].apply(
     lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
@@ -248,3 +403,9 @@ if len(problem_rows) > 0:
         problem_rows.to_csv(index=False).encode("utf-8"),
         "problem_rows_v2.csv"
     )
+
+st.markdown("""
+<div class="hub-footer">
+    Built for efficient recurring data migrations &nbsp;·&nbsp; LRD Tools
+</div>
+""", unsafe_allow_html=True)
