@@ -204,8 +204,8 @@ schedule.columns = schedule.columns.str.strip()
 # Validate required columns
 # -----------------------------
 required_update = ["TransactionId", "LegacyId", "Amount", "Costs"]
-required_crm = ["Recurring Gift Transaction Id", "Recurring Id"]
-required_schedule = ["Recurring Id", "LegacyId"]
+required_crm = ["Recurring Gift Transaction Id", "Recurring Gift Id"]
+required_schedule = ["RecurringId", "LegacyId"]
 
 for col in required_update:
     if col not in update.columns:
@@ -231,8 +231,8 @@ def normalize(val):
 update["TransactionId"] = update["TransactionId"].apply(normalize)
 update["LegacyId"] = update["LegacyId"].apply(normalize)
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(normalize)
-crm["Recurring Id"] = crm["Recurring Id"].apply(normalize)
-schedule["Recurring Id"] = schedule["Recurring Id"].apply(normalize)
+crm["Recurring Gift Id"] = crm["Recurring Gift Id"].apply(normalize)
+schedule["RecurringId"] = schedule["RecurringId"].apply(normalize)
 schedule["LegacyId"] = schedule["LegacyId"].apply(normalize)
 
 # -----------------------------
@@ -240,7 +240,7 @@ schedule["LegacyId"] = schedule["LegacyId"].apply(normalize)
 # -----------------------------
 dup_update = update["TransactionId"].duplicated().sum()
 dup_crm = crm["Recurring Gift Transaction Id"].duplicated().sum()
-dup_schedule = schedule["Recurring Id"].duplicated().sum()
+dup_schedule = schedule["RecurringId"].duplicated().sum()
 
 st.subheader("Data Integrity Checks")
 
@@ -261,24 +261,24 @@ if dup_schedule > 0:
 # -----------------------------
 
 # Step 1: Join Update → Schedule on LegacyId to get NewTransactionId
-sched_slim = schedule[["LegacyId", "Recurring Id"]].rename(columns={
+sched_slim = schedule[["LegacyId", "RecurringId"]].rename(columns={
     "LegacyId": "Sched_LegacyId",
-    "Recurring Id": "Sched_RecurringId"
+    "RecurringId": "Sched_RecurringId"
 })
 
 merged = update.merge(sched_slim, how="left", left_on="LegacyId", right_on="Sched_LegacyId")
 
-# NewTransactionId comes from Schedule["Recurring Id"]
+# NewTransactionId comes from Schedule["RecurringId"]
 merged["NewTransactionId"] = merged["Sched_RecurringId"]
 
 # Step 2: Join → CRM on Sched_LegacyId = CRM Recurring Gift Transaction Id
-crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Id"]].rename(columns={
-    "Recurring Id": "CRM_RecurringId"
+crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]].rename(columns={
+    "Recurring Gift Id": "CRM_RecurringId"
 })
 
 merged = merged.merge(crm_slim, how="left", left_on="Sched_LegacyId", right_on="Recurring Gift Transaction Id")
 
-# RecurringGiftId comes from CRM["Recurring Id"]
+# RecurringGiftId comes from CRM["Recurring Gift Id"]
 merged["RecurringGiftId"] = merged["CRM_RecurringId"]
 
 # Drop helper columns
