@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="🔄 CRM Update Builder v2",
+    page_title="🔄 LRD -> Raise CRM Updater",
     page_icon="🔄",
     layout="wide"
 )
