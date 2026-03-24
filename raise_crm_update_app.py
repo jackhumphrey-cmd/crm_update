@@ -32,7 +32,7 @@ crm.columns = crm.columns.str.strip()
 # Validate required columns
 # -----------------------------
 required_update = ["TransactionId", "LegacyId", "Amount", "Costs", "CoversCost", "TransactionSource"]
-required_crm = ["Recurring Gift Transaction Id", "Recurring Id"]
+required_crm = ["Recurring Gift Transaction Id", "Recurring Gift Id"]
 
 for col in required_update:
     if col not in update.columns:
@@ -53,7 +53,7 @@ def normalize(val):
 update["TransactionId"] = update["TransactionId"].apply(normalize)
 update["LegacyId"] = update["LegacyId"].apply(normalize)
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(normalize)
-crm["Recurring Id"] = crm["Recurring Id"].apply(normalize)
+crm["Recurring Gift Id"] = crm["Recurring Gift Id"].apply(normalize)
 
 # -----------------------------
 # Data Integrity Checks
@@ -80,7 +80,7 @@ if dup_crm > 0:
 #
 # RecurringGiftId:
 #   Update["LegacyId"] -> CRM["Recurring Gift Transaction Id"]
-#   -> pull CRM["Recurring Id"] into RecurringGiftId
+#   -> pull CRM["Recurring Gift Id"] into RecurringGiftId
 #
 # TransactionSource:
 #   Always set to "RaiseDonors"
@@ -90,13 +90,13 @@ if dup_crm > 0:
 update["NewTransactionId"] = "rd2-" + update["LegacyId"]
 
 # Step 2: Join -> CRM on LegacyId = CRM Recurring Gift Transaction Id
-crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Id"]].rename(columns={
-    "Recurring Id": "CRM_RecurringId"
+crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]].rename(columns={
+    "Recurring Gift Id": "CRM_RecurringId"
 })
 
 update = update.merge(crm_slim, how="left", left_on="LegacyId", right_on="Recurring Gift Transaction Id")
 
-# RecurringGiftId comes from CRM["Recurring Id"]
+# RecurringGiftId comes from CRM["Recurring Gift Id"]
 update["RecurringGiftId"] = update["CRM_RecurringId"]
 
 # Drop helper columns
