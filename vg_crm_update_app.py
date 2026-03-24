@@ -257,11 +257,17 @@ if dup_schedule > 0:
     st.warning("Duplicate Recurring Ids found in Schedule file.")
 
 # -----------------------------
+# DEDUP before merging to prevent row multiplication
+# -----------------------------
+crm_deduped = crm.drop_duplicates(subset=["Recurring Gift Transaction Id"], keep="first")
+schedule_deduped = schedule.drop_duplicates(subset=["LegacyId"], keep="first")
+
+# -----------------------------
 # MAPPING
 # -----------------------------
 
 # Step 1: Join Update → Schedule on LegacyId to get NewTransactionId
-sched_slim = schedule[["LegacyId", "RecurringId"]].rename(columns={
+sched_slim = schedule_deduped[["LegacyId", "RecurringId"]].rename(columns={
     "LegacyId": "Sched_LegacyId",
     "RecurringId": "Sched_RecurringId"
 })
@@ -272,7 +278,7 @@ merged = update.merge(sched_slim, how="left", left_on="LegacyId", right_on="Sche
 merged["NewTransactionId"] = merged["Sched_RecurringId"]
 
 # Step 2: Join → CRM on Sched_LegacyId = CRM Recurring Gift Transaction Id
-crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]].rename(columns={
+crm_slim = crm_deduped[["Recurring Gift Transaction Id", "Recurring Gift Id"]].rename(columns={
     "Recurring Gift Id": "CRM_RecurringId"
 })
 
