@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="🔄 LRD -> Virtuous Raise CRM Updater",
+    page_title="🔄 CRM Update Builder v2",
     page_icon="🔄",
     layout="wide"
 )
@@ -24,7 +24,6 @@ html, body, [class*="css"] {
 
 #MainMenu, footer, header { visibility: hidden; }
 
-/* ── Page header ── */
 .page-header { padding: 1.8rem 0 0.5rem; }
 .page-badge {
     display: inline-block;
@@ -61,18 +60,14 @@ html, body, [class*="css"] {
     margin: 0 0 1.5rem;
 }
 
-/* ── Sidebar ── */
 [data-testid="stSidebar"] {
     background: #ffffff !important;
     border-right: 1px solid rgba(11,126,163,0.1) !important;
 }
 [data-testid="stSidebar"] .stMarkdown h2,
-[data-testid="stSidebar"] .stMarkdown p {
-    color: #0d2d3d !important;
-}
+[data-testid="stSidebar"] .stMarkdown p { color: #0d2d3d !important; }
 [data-testid="stSidebarHeader"] { display: none; }
 
-/* ── File uploaders ── */
 [data-testid="stFileUploader"] {
     border: 1px solid rgba(11,126,163,0.2) !important;
     border-radius: 12px !important;
@@ -83,7 +78,6 @@ html, body, [class*="css"] {
     border-color: rgba(11,126,163,0.4) !important;
 }
 
-/* ── Metrics ── */
 [data-testid="stMetric"] {
     background: #ffffff;
     border: 1px solid rgba(11,126,163,0.1);
@@ -111,20 +105,17 @@ html, body, [class*="css"] {
     color: #0d2d3d !important;
 }
 
-/* ── Section headings ── */
 h2, h3 {
     font-family: 'Syne', sans-serif !important;
     color: #0d2d3d !important;
     letter-spacing: -0.02em !important;
 }
 
-/* ── Alerts ── */
 [data-testid="stAlert"] {
     border-radius: 12px !important;
     border-left-color: #0b7ea3 !important;
 }
 
-/* ── Buttons ── */
 .stDownloadButton button, .stButton button {
     background: linear-gradient(135deg, #0b7ea3 0%, #1a8cb5 100%) !important;
     color: #ffffff !important;
@@ -142,13 +133,11 @@ h2, h3 {
     box-shadow: 0 4px 14px rgba(11,126,163,0.38) !important;
 }
 
-/* ── Selectbox ── */
 [data-testid="stSelectbox"] > div > div {
     border-color: rgba(11,126,163,0.25) !important;
     border-radius: 9px !important;
 }
 
-/* ── Dataframe ── */
 [data-testid="stDataFrame"] {
     border-radius: 14px !important;
     overflow: hidden;
@@ -156,10 +145,8 @@ h2, h3 {
     box-shadow: 0 1px 3px rgba(11,126,163,0.04) !important;
 }
 
-/* ── Spinner ── */
 .stSpinner > div { border-top-color: #0b7ea3 !important; }
 
-/* ── Footer ── */
 .hub-footer {
     text-align: center;
     margin-top: 2.5rem;
@@ -201,7 +188,7 @@ crm.columns = crm.columns.str.strip()
 # Validate required columns
 # -----------------------------
 required_update = ["TransactionId", "LegacyId", "Amount", "Costs", "CoversCost", "TransactionSource"]
-required_crm = ["Recurring Gift Transaction Id", "Recurring Id"]
+required_crm = ["Recurring Gift Transaction Id", "Recurring Gift Id"]
 
 for col in required_update:
     if col not in update.columns:
@@ -215,15 +202,14 @@ for col in required_crm:
 
 # -----------------------------
 # Normalize IDs
-# BUG FIX: fillna("") before string ops to prevent NaN concatenation error
 # -----------------------------
 def normalize(val):
-    return str(val).strip().replace(".0", "") if pd.notna(val) else val
+    return str(val).strip().replace(".0", "") if pd.notna(val) else ""
 
 update["TransactionId"] = update["TransactionId"].apply(normalize)
-update["LegacyId"] = update["LegacyId"].fillna("").astype(str).str.strip()
+update["LegacyId"] = update["LegacyId"].apply(normalize)
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(normalize)
-crm["Recurring Id"] = crm["Recurring Id"].apply(normalize)
+crm["Recurring Gift Id"] = crm["Recurring Gift Id"].apply(normalize)
 
 # -----------------------------
 # Data Integrity Checks
@@ -247,17 +233,17 @@ if dup_crm > 0:
 # -----------------------------
 
 # Step 1: NewTransactionId = "rd2-" + LegacyId
-# Safe now because LegacyId has been fillna'd to ""
-update["NewTransactionId"] = "rd2-" + update["LegacyId"]
+# FIX: fillna("") ensures no NaN values cause string concatenation to fail
+update["NewTransactionId"] = "rd2-" + update["LegacyId"].fillna("")
 
 # Step 2: Join -> CRM on LegacyId = CRM Recurring Gift Transaction Id
-crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Id"]].rename(columns={
-    "Recurring Id": "CRM_RecurringId"
+crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Gift Id"]].rename(columns={
+    "Recurring Gift Id": "CRM_RecurringId"
 })
 
 update = update.merge(crm_slim, how="left", left_on="LegacyId", right_on="Recurring Gift Transaction Id")
 
-# RecurringGiftId comes from CRM["Recurring Id"]
+# RecurringGiftId comes from CRM["Recurring Gift Id"]
 update["RecurringGiftId"] = update["CRM_RecurringId"]
 
 # Drop helper columns
@@ -268,7 +254,6 @@ update["TransactionSource"] = "RaiseDonors"
 
 # -----------------------------
 # CoversCost Project Split
-# Modifies the original row in-place using the next available ProjectN slot
 # -----------------------------
 
 def is_covers_cost(val):
@@ -278,6 +263,7 @@ def is_blank(val):
     return pd.isna(val) or str(val).strip() == "" or str(val).strip().lower() == "nan"
 
 def find_next_project_slot(row, columns):
+    """Return the lowest N where ProjectNCode, ProjectNName, ProjectNAmount are all blank."""
     i = 1
     while True:
         code_col = f"Project{i}Code"
@@ -350,7 +336,7 @@ st.subheader("🔍 Mapping Debugger")
 debug_df = output[["TransactionId", "LegacyId", "NewTransactionId", "RecurringGiftId", "TransactionSource"]].copy()
 
 debug_df["NewTxn Match"] = debug_df["NewTransactionId"].apply(
-    lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
+    lambda x: "✅" if pd.notna(x) and str(x).lower() not in ("nan", "rd2-", "") else "❌"
 )
 debug_df["CRM Match"] = debug_df["RecurringGiftId"].apply(
     lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
