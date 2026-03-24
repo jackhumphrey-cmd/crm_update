@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="🔄 LRD -> Raise CRM Updater",
+    page_title="🔄 CRM Update Builder v2",
     page_icon="🔄",
     layout="wide"
 )
@@ -173,7 +173,7 @@ h2, h3 {
 st.markdown("""
 <div class="page-header">
     <div class="page-badge">LRD Internal Tools</div>
-    <h1 class="page-title">LRD -> Raise CRM Updater</h1>
+    <h1 class="page-title">CRM <span>Update Builder v2</span></h1>
     <p class="page-sub">Map and export CRM update files with project split support.</p>
 </div>
 """, unsafe_allow_html=True)
@@ -292,6 +292,25 @@ def find_next_project_slot(row, columns):
         i += 1
 
 output = update.copy()
+
+# -----------------------------
+# Pre-create Project2 slot if only Project1 exists
+# This ensures CoversCost rows always have an available slot to write into
+# -----------------------------
+existing_project_nums = set()
+import re as _re
+for col in output.columns:
+    m = _re.match(r"Project(\d+)(Code|Name|Amount)", col)
+    if m:
+        existing_project_nums.add(int(m.group(1)))
+
+if existing_project_nums:
+    next_slot = max(existing_project_nums) + 1
+    for suffix in ["Code", "Name", "Amount"]:
+        col = f"Project{next_slot}{suffix}"
+        if col not in output.columns:
+            output[col] = ""
+
 covers_cost_count = 0
 
 for idx, row in output.iterrows():
