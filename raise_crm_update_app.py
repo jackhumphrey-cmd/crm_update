@@ -173,7 +173,7 @@ h2, h3 {
 st.markdown("""
 <div class="page-header">
     <div class="page-badge">LRD Internal Tools</div>
-    <h1 class="page-title">CRM <span>Update Builder v2</span></h1>
+    <h1 class="page-title">LRD -> Raise CRM Updater</h1>
     <p class="page-sub">Map and export CRM update files with project split support.</p>
 </div>
 """, unsafe_allow_html=True)
