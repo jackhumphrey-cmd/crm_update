@@ -2,12 +2,181 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="🔄 CRM Update Builder v2",
+    page_title="🔄 LRD -> Virtuous Raise CRM Updater",
     page_icon="🔄",
     layout="wide"
 )
 
-st.title("🔄 CRM Update Builder v2")
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+}
+
+.stApp {
+    background: #f0f7fb;
+    background-image:
+        radial-gradient(ellipse 70% 40% at 55% 0%, rgba(26,140,181,0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 5% 95%, rgba(11,126,163,0.1) 0%, transparent 60%);
+}
+
+#MainMenu, footer, header { visibility: hidden; }
+
+/* ── Page header ── */
+.page-header { padding: 1.8rem 0 0.5rem; }
+.page-badge {
+    display: inline-block;
+    background: rgba(11,126,163,0.1);
+    border: 1px solid rgba(11,126,163,0.25);
+    color: #0b7ea3;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    margin-bottom: 0.9rem;
+}
+.page-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0d2d3d;
+    letter-spacing: -0.03em;
+    margin: 0 0 0.4rem;
+    line-height: 1.15;
+}
+.page-title span {
+    background: linear-gradient(135deg, #0b7ea3 0%, #1ab5d4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.page-sub {
+    font-size: 0.88rem;
+    color: #6a8fa0;
+    font-weight: 300;
+    margin: 0 0 1.5rem;
+}
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: #ffffff !important;
+    border-right: 1px solid rgba(11,126,163,0.1) !important;
+}
+[data-testid="stSidebar"] .stMarkdown h2,
+[data-testid="stSidebar"] .stMarkdown p {
+    color: #0d2d3d !important;
+}
+[data-testid="stSidebarHeader"] { display: none; }
+
+/* ── File uploaders ── */
+[data-testid="stFileUploader"] {
+    border: 1px solid rgba(11,126,163,0.2) !important;
+    border-radius: 12px !important;
+    padding: 0.5rem 0.75rem !important;
+    background: rgba(240,247,251,0.6) !important;
+}
+[data-testid="stFileUploader"]:hover {
+    border-color: rgba(11,126,163,0.4) !important;
+}
+
+/* ── Metrics ── */
+[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid rgba(11,126,163,0.1);
+    border-radius: 14px;
+    padding: 1.4rem 1.6rem !important;
+    box-shadow: 0 1px 3px rgba(11,126,163,0.05), 0 4px 12px rgba(11,126,163,0.06);
+}
+[data-testid="stMetricLabel"] {
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.68rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase !important;
+    color: #7aaabb !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    line-height: 1.35 !important;
+    margin-bottom: 0.4rem !important;
+}
+[data-testid="stMetricValue"] {
+    font-family: 'Syne', sans-serif !important;
+    font-size: 1.4rem !important;
+    font-weight: 700 !important;
+    color: #0d2d3d !important;
+}
+
+/* ── Section headings ── */
+h2, h3 {
+    font-family: 'Syne', sans-serif !important;
+    color: #0d2d3d !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* ── Alerts ── */
+[data-testid="stAlert"] {
+    border-radius: 12px !important;
+    border-left-color: #0b7ea3 !important;
+}
+
+/* ── Buttons ── */
+.stDownloadButton button, .stButton button {
+    background: linear-gradient(135deg, #0b7ea3 0%, #1a8cb5 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 9px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    padding: 0.5rem 1.2rem !important;
+    box-shadow: 0 2px 8px rgba(11,126,163,0.28) !important;
+    transition: opacity 0.2s !important;
+}
+.stDownloadButton button:hover, .stButton button:hover {
+    opacity: 0.88 !important;
+    box-shadow: 0 4px 14px rgba(11,126,163,0.38) !important;
+}
+
+/* ── Selectbox ── */
+[data-testid="stSelectbox"] > div > div {
+    border-color: rgba(11,126,163,0.25) !important;
+    border-radius: 9px !important;
+}
+
+/* ── Dataframe ── */
+[data-testid="stDataFrame"] {
+    border-radius: 14px !important;
+    overflow: hidden;
+    border: 1px solid rgba(11,126,163,0.1) !important;
+    box-shadow: 0 1px 3px rgba(11,126,163,0.04) !important;
+}
+
+/* ── Spinner ── */
+.stSpinner > div { border-top-color: #0b7ea3 !important; }
+
+/* ── Footer ── */
+.hub-footer {
+    text-align: center;
+    margin-top: 2.5rem;
+    font-size: 0.71rem;
+    color: #a8c8d8;
+    letter-spacing: 0.04em;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="page-header">
+    <div class="page-badge">LRD Internal Tools</div>
+    <h1 class="page-title">LRD → Virtuous <span>Raise CRM Updater</span></h1>
+    <p class="page-sub">Map and export CRM update files for LRD to Raise migrations.</p>
+</div>
+""", unsafe_allow_html=True)
 
 # -----------------------------
 # Uploads
@@ -46,12 +215,13 @@ for col in required_crm:
 
 # -----------------------------
 # Normalize IDs
+# BUG FIX: fillna("") before string ops to prevent NaN concatenation error
 # -----------------------------
 def normalize(val):
     return str(val).strip().replace(".0", "") if pd.notna(val) else val
 
 update["TransactionId"] = update["TransactionId"].apply(normalize)
-update["LegacyId"] = update["LegacyId"].apply(normalize)
+update["LegacyId"] = update["LegacyId"].fillna("").astype(str).str.strip()
 crm["Recurring Gift Transaction Id"] = crm["Recurring Gift Transaction Id"].apply(normalize)
 crm["Recurring Id"] = crm["Recurring Id"].apply(normalize)
 
@@ -74,22 +244,13 @@ if dup_crm > 0:
 
 # -----------------------------
 # MAPPING
-#
-# NewTransactionId:
-#   "rd2-" + Update["LegacyId"]
-#
-# RecurringGiftId:
-#   Update["LegacyId"] → CRM["Recurring Gift Transaction Id"]
-#   → pull CRM["Recurring Id"] into RecurringGiftId
-#
-# TransactionSource:
-#   Always set to "RaiseDonors"
 # -----------------------------
 
 # Step 1: NewTransactionId = "rd2-" + LegacyId
+# Safe now because LegacyId has been fillna'd to ""
 update["NewTransactionId"] = "rd2-" + update["LegacyId"]
 
-# Step 2: Join → CRM on LegacyId = CRM Recurring Gift Transaction Id
+# Step 2: Join -> CRM on LegacyId = CRM Recurring Gift Transaction Id
 crm_slim = crm[["Recurring Gift Transaction Id", "Recurring Id"]].rename(columns={
     "Recurring Id": "CRM_RecurringId"
 })
@@ -107,44 +268,50 @@ update["TransactionSource"] = "RaiseDonors"
 
 # -----------------------------
 # CoversCost Project Split
-#
-# For rows where CoversCost == "True":
-#   - Add Costs to Amount on original row
-#   - Append a new split row with:
-#       ProjectCode    = "CREDITCARDCOSTS"
-#       ProjectName    = "Processing Fees"
-#       ProjectAmount  = Costs value
+# Modifies the original row in-place using the next available ProjectN slot
 # -----------------------------
 
 def is_covers_cost(val):
     return str(val).strip().lower() == "true"
 
-split_rows = []
+def is_blank(val):
+    return pd.isna(val) or str(val).strip() == "" or str(val).strip().lower() == "nan"
 
-for _, row in update.iterrows():
+def find_next_project_slot(row, columns):
+    i = 1
+    while True:
+        code_col = f"Project{i}Code"
+        name_col = f"Project{i}Name"
+        amt_col  = f"Project{i}Amount"
+        if code_col not in columns and name_col not in columns and amt_col not in columns:
+            return None
+        if is_blank(row.get(code_col, "")) and is_blank(row.get(name_col, "")) and is_blank(row.get(amt_col, "")):
+            return i
+        i += 1
+
+output = update.copy()
+covers_cost_count = 0
+
+for idx, row in output.iterrows():
     if is_covers_cost(row.get("CoversCost", "")):
         try:
             amount = float(row["Amount"])
-            costs = float(row["Costs"])
-            row["Amount"] = str(round(amount + costs, 2))
+            costs  = float(row["Costs"])
+            output.at[idx, "Amount"] = str(round(amount + costs, 2))
         except (ValueError, TypeError):
             pass
 
-        split_row = row.copy()
-        split_row["ProjectCode"] = "CREDITCARDCOSTS"
-        split_row["ProjectName"] = "Processing Fees"
-        split_row["ProjectAmount"] = row["Costs"]
-        split_rows.append(split_row)
-
-# Rebuild update with modified amounts, then append split rows
-if split_rows:
-    split_df = pd.DataFrame(split_rows)
-    output = pd.concat([update, split_df], ignore_index=True)
-else:
-    output = update.copy()
-
-# Sort so split rows appear directly below their parent row
-output = output.sort_values(by="TransactionId", kind="stable").reset_index(drop=True)
+        slot = find_next_project_slot(row, output.columns.tolist())
+        if slot is not None:
+            output.at[idx, f"Project{slot}Code"]   = "CREDITCARDCOSTS"
+            output.at[idx, f"Project{slot}Name"]   = "Processing Fees"
+            output.at[idx, f"Project{slot}Amount"] = row["Costs"]
+            covers_cost_count += 1
+        else:
+            st.warning(
+                f"Row {idx} (TransactionId: {row.get('TransactionId', '')}) "
+                f"has no available project slot for the CoversCost split."
+            )
 
 # -----------------------------
 # Summary Metrics
@@ -152,17 +319,16 @@ output = output.sort_values(by="TransactionId", kind="stable").reset_index(drop=
 def is_missing(series):
     return series.isna() | (series.astype(str).str.lower() == "nan")
 
-missing_recurring_gift = is_missing(output["RecurringGiftId"]).sum()
+missing_recurring_gift  = is_missing(output["RecurringGiftId"]).sum()
 missing_new_transaction = is_missing(output["NewTransactionId"]).sum()
-covers_cost_count = update["CoversCost"].apply(is_covers_cost).sum()
 
 st.subheader("Mapping Summary")
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Rows (incl. splits)", len(output))
+col1.metric("Total Rows", len(output))
 col2.metric("Missing RecurringGiftId", missing_recurring_gift)
 col3.metric("Missing NewTransactionId", missing_new_transaction)
-col4.metric("CoversCost Split Rows Added", len(split_rows))
+col4.metric("CoversCost Splits Applied", covers_cost_count)
 
 # -----------------------------
 # Preview Output
@@ -177,13 +343,13 @@ csv = output.to_csv(index=False).encode("utf-8")
 st.download_button("Download Updated File", csv, "crm_updates_v2.csv")
 
 # =========================================================
-# 🔍 DEBUGGER PANEL
+# DEBUGGER PANEL
 # =========================================================
 st.subheader("🔍 Mapping Debugger")
 
 debug_df = output[["TransactionId", "LegacyId", "NewTransactionId", "RecurringGiftId", "TransactionSource"]].copy()
 
-debug_df["Schedule Match"] = debug_df["NewTransactionId"].apply(
+debug_df["NewTxn Match"] = debug_df["NewTransactionId"].apply(
     lambda x: "✅" if pd.notna(x) and str(x).lower() != "nan" else "❌"
 )
 debug_df["CRM Match"] = debug_df["RecurringGiftId"].apply(
@@ -191,9 +357,9 @@ debug_df["CRM Match"] = debug_df["RecurringGiftId"].apply(
 )
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("NewTransactionId Matched", (debug_df["Schedule Match"] == "✅").sum())
-col2.metric("NewTransactionId Missing", (debug_df["Schedule Match"] == "❌").sum())
-col3.metric("CRM Matched", (debug_df["CRM Match"] == "✅").sum())
+col1.metric("NewTransactionId Matched", (debug_df["NewTxn Match"] == "✅").sum())
+col2.metric("NewTransactionId Missing",  (debug_df["NewTxn Match"] == "❌").sum())
+col3.metric("CRM Matched",   (debug_df["CRM Match"] == "✅").sum())
 col4.metric("CRM Unmatched", (debug_df["CRM Match"] == "❌").sum())
 
 status_filter = st.selectbox(
@@ -202,9 +368,9 @@ status_filter = st.selectbox(
 )
 
 if status_filter == "NewTransactionId Matched":
-    filtered = debug_df[debug_df["Schedule Match"] == "✅"]
+    filtered = debug_df[debug_df["NewTxn Match"] == "✅"]
 elif status_filter == "NewTransactionId Missing":
-    filtered = debug_df[debug_df["Schedule Match"] == "❌"]
+    filtered = debug_df[debug_df["NewTxn Match"] == "❌"]
 elif status_filter == "CRM Matched":
     filtered = debug_df[debug_df["CRM Match"] == "✅"]
 elif status_filter == "CRM Unmatched":
@@ -235,3 +401,9 @@ if len(problem_rows) > 0:
         problem_rows.to_csv(index=False).encode("utf-8"),
         "problem_rows_v2.csv"
     )
+
+st.markdown("""
+<div class="hub-footer">
+    Built for efficient recurring data migrations &nbsp;·&nbsp; LRD Tools
+</div>
+""", unsafe_allow_html=True)
