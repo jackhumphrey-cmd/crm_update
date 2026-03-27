@@ -194,6 +194,15 @@ st.markdown("""
     </div>
     <span class="card-btn">Launch →</span>
 </a>
+
+<a class="tool-card" href="https://platform-update.streamlit.app" target="_blank">
+    <div class="card-icon">⬆️</div>
+    <div class="card-body">
+        <p class="card-title">VG → Raise CRM Updates</p>
+        <p class="card-desc">Performs CRM updates for migrations from Virtuous Giving to Virtuous Raise.</p>
+    </div>
+    <span class="card-btn">Launch →</span>
+</a>
 """, unsafe_allow_html=True)
 
 # ── Footer ──
