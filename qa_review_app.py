@@ -3,7 +3,7 @@ import streamlit as st
 import re
 
 st.set_page_config(
-    page_title="Migration QA Review",
+    page_title="🔍 Migration QA Tool",
     page_icon="🔍",
     layout="wide"
 )
@@ -134,11 +134,6 @@ h2, h3 {
     box-shadow: 0 4px 14px rgba(11,126,163,0.38) !important;
 }
 
-[data-testid="stSelectbox"] > div > div {
-    border-color: rgba(11,126,163,0.25) !important;
-    border-radius: 9px !important;
-}
-
 [data-testid="stDataFrame"] {
     border-radius: 14px !important;
     overflow: hidden;
@@ -155,24 +150,14 @@ h2, h3 {
     color: #a8c8d8;
     letter-spacing: 0.04em;
 }
-
-/* ── QA check section cards ── */
-.check-header {
-    font-family: 'Syne', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #0d2d3d;
-    letter-spacing: -0.01em;
-    margin: 0.2rem 0 0.1rem;
-}
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("""
 <div class="page-header">
     <div class="page-badge">LRD Internal Tools</div>
-    <h1 class="page-title">Migration <span>QA Review</span></h1>
-    <p class="page-sub">Upload a migration file to run automated quality assurance checks before import.</p>
+    <h1 class="page-title">Migration <span>QA Tool</span></h1>
+    <p class="page-sub">Run quality assurance checks on your final migration file before import.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -182,227 +167,180 @@ st.markdown("""
 migration_file = st.sidebar.file_uploader("Migration File (CSV)", type=["csv"])
 
 if not migration_file:
-    st.warning("Please upload a migration file to begin.")
+    st.warning("Please upload your migration file to begin.")
     st.stop()
 
+with st.spinner("Running QA checks..."):
+
+    df = pd.read_csv(migration_file, dtype=str)
+    df.columns = df.columns.str.strip()
+
+    # -----------------------------
+    # Constants
+    # -----------------------------
+    REQUIRED_FIELDS = [
+        "FirstName", "LastName", "Email", "PaymentMethodType",
+        "PaymentMethodId", "Amount", "Frequency", "NextPaymentDate",
+        "CustomerId", "Project1Code", "Project1Name", "Project1Amount"
+    ]
+    VALID_PAYMENT_TYPES = {"Credit", "ACH"}
+    VALID_FREQUENCIES   = {"Monthly", "Annually", "Fortnightly", "Quarterly", "Semiannually"}
+    DATE_PATTERN        = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
+    MULTI_NAME_PATTERN  = re.compile(r"&| and ", re.IGNORECASE)
+
+    # Detect all ProjectN amount columns dynamically
+    project_amount_cols = sorted(
+        [c for c in df.columns if re.match(r"Project\d+Amount", c)],
+        key=lambda x: int(re.search(r"\d+", x).group())
+    )
+
+    # -----------------------------
+    # Run checks row-by-row
+    # -----------------------------
+    flags = []
+
+    for idx, row in df.iterrows():
+        row_flags = []
+
+        # 1. Missing required fields
+        for field in REQUIRED_FIELDS:
+            val = row.get(field, "")
+            if pd.isna(val) or str(val).strip() == "":
+                row_flags.append(f"Missing: {field}")
+
+        # 2. Project splits must sum to Amount
+        try:
+            total_amount = float(row.get("Amount", 0) or 0)
+            split_total  = sum(
+                float(row.get(col, 0) or 0)
+                for col in project_amount_cols
+                if str(row.get(col, "")).strip() not in ("", "nan")
+            )
+            if project_amount_cols and round(split_total, 2) != round(total_amount, 2):
+                row_flags.append(
+                    f"Split mismatch: splits sum to {round(split_total, 2)}, Amount is {round(total_amount, 2)}"
+                )
+        except (ValueError, TypeError):
+            row_flags.append("Split mismatch: could not parse Amount or project amounts")
+
+        # 3. #N/A in PaymentMethodId or CustomerId
+        for field in ["PaymentMethodId", "CustomerId"]:
+            val = str(row.get(field, "")).strip()
+            if val == "#N/A":
+                row_flags.append(f"Unmapped ID: {field} = #N/A")
+
+        # 4. PaymentMethodType must be Credit or ACH
+        pmt = str(row.get("PaymentMethodType", "")).strip()
+        if pmt and pmt not in VALID_PAYMENT_TYPES:
+            row_flags.append(f"Invalid PaymentMethodType: '{pmt}'")
+
+        # 5. NextPaymentDate format must be D/M/YYYY or DD/MM/YYYY (no timestamps)
+        date_val = str(row.get("NextPaymentDate", "")).strip()
+        if date_val and not DATE_PATTERN.match(date_val):
+            row_flags.append(f"Invalid date format: '{date_val}'")
+
+        # 6. Multiple names in FirstName (& or ' and ')
+        first_name = str(row.get("FirstName", "")).strip()
+        if MULTI_NAME_PATTERN.search(first_name):
+            row_flags.append(f"Multiple names in FirstName: '{first_name}'")
+
+        # 7. Frequency must be one of the valid values
+        freq = str(row.get("Frequency", "")).strip()
+        if freq and freq not in VALID_FREQUENCIES:
+            row_flags.append(f"Invalid Frequency: '{freq}'")
+
+        flags.append("; ".join(row_flags) if row_flags else "")
+
+    df["QA_Flags"] = flags
+    df["QA_Pass"]  = df["QA_Flags"] == ""
+
+    clean_rows    = df[df["QA_Pass"]]
+    flagged_rows  = df[~df["QA_Pass"]]
+
+    # -----------------------------
+    # Per-check counts for summary
+    # -----------------------------
+    def count_flag(keyword):
+        return df["QA_Flags"].str.contains(keyword, na=False).sum()
+
+    total          = len(df)
+    total_pass     = len(clean_rows)
+    total_fail     = len(flagged_rows)
+    missing_count  = count_flag("Missing:")
+    split_count    = count_flag("Split mismatch")
+    na_count       = count_flag("Unmapped ID")
+    pmt_count      = count_flag("Invalid PaymentMethodType")
+    date_count     = count_flag("Invalid date format")
+    name_count     = count_flag("Multiple names")
+    freq_count     = count_flag("Invalid Frequency")
+
 # -----------------------------
-# Load
+# QA Summary
 # -----------------------------
-df = pd.read_csv(migration_file, dtype=str)
-df.columns = df.columns.str.strip()
-
-st.sidebar.success(f"{len(df)} rows loaded")
-
-# -----------------------------
-# Detect project split columns dynamically
-# -----------------------------
-project_amount_cols = sorted(
-    [c for c in df.columns if re.match(r"Project\d+Amount", c)],
-    key=lambda x: int(re.search(r"\d+", x).group())
-)
-project_code_cols = sorted(
-    [c for c in df.columns if re.match(r"Project\d+Code", c)],
-    key=lambda x: int(re.search(r"\d+", x).group())
-)
-project_name_cols = sorted(
-    [c for c in df.columns if re.match(r"Project\d+Name", c)],
-    key=lambda x: int(re.search(r"\d+", x).group())
-)
-
-# -----------------------------
-# Helper
-# -----------------------------
-def is_blank(val):
-    return pd.isna(val) or str(val).strip() == "" or str(val).strip().lower() in ("nan", "none")
-
-# =====================================================================
-# QA CHECKS
-# =====================================================================
-
-# -- 1. Required fields missing --
-required_fields = [
-    "FirstName", "LastName", "Email", "PaymentMethodType",
-    "PaymentMethodId", "Amount", "Frequency", "NextPaymentDate",
-    "CustomerId", "Project1Code", "Project1Name", "Project1Amount"
-]
-
-missing_flags = {}
-for field in required_fields:
-    if field in df.columns:
-        missing_flags[field] = df[field].apply(is_blank)
-    else:
-        missing_flags[field] = pd.Series([True] * len(df))
-
-df["_missing_required"] = pd.DataFrame(missing_flags).any(axis=1)
-missing_required_details = {f: missing_flags[f].sum() for f in required_fields if missing_flags[f].sum() > 0}
-
-# -- 2. Project split amounts must equal Amount --
-def check_split_mismatch(row):
-    try:
-        total = float(row["Amount"])
-        split_sum = sum(
-            float(row[c]) for c in project_amount_cols
-            if c in row and not is_blank(row[c])
-        )
-        return abs(total - round(split_sum, 2)) > 0.01
-    except (ValueError, TypeError):
-        return False
-
-df["_split_mismatch"] = df.apply(check_split_mismatch, axis=1)
-
-# -- 3. #N/A in PaymentMethodId or CustomerId --
-def has_na_error(val):
-    return str(val).strip().upper() == "#N/A"
-
-df["_payment_id_na"] = df["PaymentMethodId"].apply(has_na_error) if "PaymentMethodId" in df.columns else False
-df["_customer_id_na"] = df["CustomerId"].apply(has_na_error) if "CustomerId" in df.columns else False
-df["_id_na_error"] = df["_payment_id_na"] | df["_customer_id_na"]
-
-# -- 4. PaymentMethodType must be Credit or ACH --
-valid_payment_types = {"Credit", "ACH"}
-df["_invalid_payment_type"] = df["PaymentMethodType"].apply(
-    lambda x: str(x).strip() not in valid_payment_types if not is_blank(x) else False
-) if "PaymentMethodType" in df.columns else False
-
-# -- 5. NextPaymentDate format MM/DD/YYYY (no timestamps) --
-date_pattern = re.compile(r"^\d{2}/\d{2}/\d{4}$")
-df["_bad_date_format"] = df["NextPaymentDate"].apply(
-    lambda x: not bool(date_pattern.match(str(x).strip())) if not is_blank(x) else False
-) if "NextPaymentDate" in df.columns else False
-
-# -- 6. Multiple names in FirstName (&  or ' and ') --
-multi_name_pattern = re.compile(r"&| and ", re.IGNORECASE)
-df["_multi_name"] = df["FirstName"].apply(
-    lambda x: bool(multi_name_pattern.search(str(x))) if not is_blank(x) else False
-) if "FirstName" in df.columns else False
-
-# -- Overall flag --
-flag_cols = [
-    "_missing_required", "_split_mismatch", "_id_na_error",
-    "_invalid_payment_type", "_bad_date_format", "_multi_name"
-]
-df["_any_issue"] = df[flag_cols].any(axis=1)
-total_issues = df["_any_issue"].sum()
-
-# =====================================================================
-# SUMMARY DASHBOARD
-# =====================================================================
 st.subheader("QA Summary")
 
-col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Total Rows", len(df))
-col2.metric("Rows with Issues", int(total_issues))
-col3.metric("Missing Required Fields", int(df["_missing_required"].sum()))
-col4.metric("Split Amount Mismatches", int(df["_split_mismatch"].sum()))
-col5.metric("ID Mapping Errors (#N/A)", int(df["_id_na_error"].sum()))
-col6.metric("Invalid Payment Types", int(df["_invalid_payment_type"].sum()))
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Rows", total)
+col2.metric("Passed", total_pass)
+col3.metric("Flagged", total_fail)
 
-col1b, col2b = st.columns(2)
-col1b.metric("Bad Date Formats", int(df["_bad_date_format"].sum()))
-col2b.metric("Multiple Names in FirstName", int(df["_multi_name"].sum()))
+st.write("")
 
-# Overall status
-if total_issues == 0:
-    st.success("✅ All checks passed — this file looks good to import!")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Missing Required Fields", missing_count)
+col2.metric("Split Amount Mismatches", split_count)
+col3.metric("Unmapped IDs (#N/A)", na_count)
+col4.metric("Invalid Payment Type", pmt_count)
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Invalid Date Format", date_count)
+col2.metric("Multiple Names", name_count)
+col3.metric("Invalid Frequency", freq_count)
+
+# -----------------------------
+# Status banner
+# -----------------------------
+if total_fail == 0:
+    st.success("✅ All rows passed QA — file looks good to import!")
 else:
-    st.error(f"⚠️ {int(total_issues)} row(s) flagged across one or more checks. Review the details below.")
+    st.warning(f"{total_fail} row(s) have QA issues. Review the flagged rows below before importing.")
 
-# =====================================================================
-# INDIVIDUAL CHECK DETAILS
-# =====================================================================
-st.subheader("Check Details")
-
-# -- 1. Missing required fields --
-with st.expander(f"① Missing Required Fields — {int(df['_missing_required'].sum())} row(s)"):
-    if missing_required_details:
-        for field, count in missing_required_details.items():
-            st.warning(f"**{field}**: {count} missing value(s)")
-        problem = df[df["_missing_required"]][[c for c in ["FirstName","LastName","Email","PaymentMethodType",
-            "PaymentMethodId","Amount","Frequency","NextPaymentDate",
-            "CustomerId","Project1Code","Project1Name","Project1Amount",
-            "LegacyId"] if c in df.columns]]
-        st.dataframe(problem, use_container_width=True)
-        st.download_button("Download Rows", problem.to_csv(index=False).encode(), "qa_missing_fields.csv")
-    else:
-        st.success("No missing required fields.")
-
-# -- 2. Split mismatches --
-with st.expander(f"② Project Split Amount Mismatches — {int(df['_split_mismatch'].sum())} row(s)"):
-    if df["_split_mismatch"].sum() > 0:
-        cols_to_show = (["FirstName", "LastName", "LegacyId", "Amount"] +
-                        project_amount_cols + ["_split_mismatch"])
-        problem = df[df["_split_mismatch"]][[c for c in cols_to_show if c in df.columns]].copy()
-        problem["SplitSum"] = problem[[c for c in project_amount_cols if c in problem.columns]].apply(
-            pd.to_numeric, errors="coerce").sum(axis=1).round(2)
-        problem["Discrepancy"] = (
-            pd.to_numeric(problem["Amount"], errors="coerce") - problem["SplitSum"]
-        ).round(2)
-        st.dataframe(problem, use_container_width=True)
-        st.download_button("Download Rows", problem.to_csv(index=False).encode(), "qa_split_mismatch.csv")
-    else:
-        st.success("All project splits match their schedule amounts.")
-
-# -- 3. #N/A ID errors --
-with st.expander(f"③ ID Mapping Errors (#N/A) — {int(df['_id_na_error'].sum())} row(s)"):
-    if df["_id_na_error"].sum() > 0:
-        problem = df[df["_id_na_error"]][[c for c in
-            ["FirstName","LastName","LegacyId","PaymentMethodId","CustomerId"] if c in df.columns]]
-        st.warning(f"PaymentMethodId errors: {int(df['_payment_id_na'].sum())}  |  CustomerId errors: {int(df['_customer_id_na'].sum())}")
-        st.dataframe(problem, use_container_width=True)
-        st.download_button("Download Rows", problem.to_csv(index=False).encode(), "qa_id_errors.csv")
-    else:
-        st.success("No #N/A mapping errors found.")
-
-# -- 4. Invalid payment types --
-with st.expander(f"④ Invalid PaymentMethodType Values — {int(df['_invalid_payment_type'].sum())} row(s)"):
-    if df["_invalid_payment_type"].sum() > 0:
-        problem = df[df["_invalid_payment_type"]][[c for c in
-            ["FirstName","LastName","LegacyId","PaymentMethodType"] if c in df.columns]]
-        st.warning("Expected values: **Credit** or **ACH** only.")
-        st.dataframe(problem, use_container_width=True)
-        st.download_button("Download Rows", problem.to_csv(index=False).encode(), "qa_payment_type.csv")
-    else:
-        st.success("All PaymentMethodType values are valid.")
-
-# -- 5. Bad date formats --
-with st.expander(f"⑤ Invalid NextPaymentDate Format — {int(df['_bad_date_format'].sum())} row(s)"):
-    if df["_bad_date_format"].sum() > 0:
-        problem = df[df["_bad_date_format"]][[c for c in
-            ["FirstName","LastName","LegacyId","NextPaymentDate"] if c in df.columns]]
-        st.warning("Expected format: **MM/DD/YYYY** — timestamps or other formats are not accepted.")
-        st.dataframe(problem, use_container_width=True)
-        st.download_button("Download Rows", problem.to_csv(index=False).encode(), "qa_date_format.csv")
-    else:
-        st.success("All NextPaymentDate values are correctly formatted.")
-
-# -- 6. Multiple names --
-with st.expander(f"⑥ Multiple Names in FirstName — {int(df['_multi_name'].sum())} row(s)"):
-    if df["_multi_name"].sum() > 0:
-        problem = df[df["_multi_name"]][[c for c in
-            ["FirstName","LastName","LegacyId","Email"] if c in df.columns]]
-        st.warning("These rows contain '&' or ' and ' in the FirstName field, suggesting multiple donors.")
-        st.dataframe(problem, use_container_width=True)
-        st.download_button("Download Rows", problem.to_csv(index=False).encode(), "qa_multi_name.csv")
-    else:
-        st.success("No multiple names detected in FirstName.")
-
-# =====================================================================
-# FULL FILE PREVIEW
-# =====================================================================
-st.subheader("File Preview")
-display_cols = [c for c in df.columns if not c.startswith("_")]
-st.dataframe(df[display_cols], use_container_width=True)
-
-# =====================================================================
-# DOWNLOAD ALL FLAGGED ROWS
-# =====================================================================
-if total_issues > 0:
-    flagged = df[df["_any_issue"]][display_cols]
+# -----------------------------
+# Flagged rows
+# -----------------------------
+if len(flagged_rows) > 0:
+    st.subheader("Flagged Rows")
+    st.dataframe(flagged_rows, use_container_width=True)
     st.download_button(
-        "⬇️ Download All Flagged Rows",
-        flagged.to_csv(index=False).encode(),
-        "qa_all_flagged.csv"
+        "Download Flagged Rows",
+        flagged_rows.to_csv(index=False).encode("utf-8"),
+        "qa_flagged_rows.csv",
+        "text/csv"
     )
+
+# -----------------------------
+# Clean rows
+# -----------------------------
+st.subheader("Clean Rows Preview")
+st.dataframe(clean_rows.drop(columns=["QA_Flags", "QA_Pass"], errors="ignore"), use_container_width=True)
+st.download_button(
+    "Download Clean Rows",
+    clean_rows.drop(columns=["QA_Flags", "QA_Pass"], errors="ignore").to_csv(index=False).encode("utf-8"),
+    "qa_clean_rows.csv",
+    "text/csv"
+)
+
+# -----------------------------
+# Full file with flags
+# -----------------------------
+st.subheader("Full File with QA Flags")
+st.dataframe(df, use_container_width=True)
+st.download_button(
+    "Download Full File with Flags",
+    df.to_csv(index=False).encode("utf-8"),
+    "qa_full_output.csv",
+    "text/csv"
+)
 
 st.markdown("""
 <div class="hub-footer">
