@@ -185,7 +185,7 @@ with st.spinner("Running QA checks..."):
     ]
     VALID_PAYMENT_TYPES = {"Credit", "ACH"}
     VALID_FREQUENCIES   = {"Monthly", "Annually", "Fortnightly", "Quarterly", "Semiannually"}
-    DATE_PATTERN        = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
+    DATE_PATTERN        = re.compile(r"^\d{1,2}/\d{1,2}/\d{2,4}$")
     MULTI_NAME_PATTERN  = re.compile(r"&| and ", re.IGNORECASE)
 
     # Detect all ProjectN amount columns dynamically
@@ -275,7 +275,7 @@ with st.spinner("Running QA checks..."):
     freq_count     = count_flag("Invalid Frequency")
 
 # -----------------------------
-# QA Summary
+# QA Summary — top metrics
 # -----------------------------
 st.subheader("QA Summary")
 
@@ -286,61 +286,76 @@ col3.metric("Flagged", total_fail)
 
 st.write("")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Missing Required Fields", missing_count)
-col2.metric("Split Amount Mismatches", split_count)
-col3.metric("Unmapped IDs (#N/A)", na_count)
-col4.metric("Invalid Payment Type", pmt_count)
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Invalid Date Format", date_count)
-col2.metric("Multiple Names", name_count)
-col3.metric("Invalid Frequency", freq_count)
-
-# -----------------------------
-# Status banner
-# -----------------------------
 if total_fail == 0:
     st.success("✅ All rows passed QA — file looks good to import!")
 else:
-    st.warning(f"{total_fail} row(s) have QA issues. Review the flagged rows below before importing.")
+    st.warning(f"{total_fail} row(s) have QA issues. Review the checks below before importing.")
+
+st.write("")
 
 # -----------------------------
-# Flagged rows
+# Per-check expanders
 # -----------------------------
-if len(flagged_rows) > 0:
-    st.subheader("Flagged Rows")
-    st.dataframe(flagged_rows, use_container_width=True)
+checks = [
+    ("Missing Required Fields",  "Missing:",                missing_count),
+    ("Split Amount Mismatches",  "Split mismatch",          split_count),
+    ("Unmapped IDs (#N/A)",      "Unmapped ID",             na_count),
+    ("Invalid Payment Type",     "Invalid PaymentMethodType", pmt_count),
+    ("Invalid Date Format",      "Invalid date format",     date_count),
+    ("Multiple Names in FirstName", "Multiple names",       name_count),
+    ("Invalid Frequency",        "Invalid Frequency",       freq_count),
+]
+
+for label, keyword, count in checks:
+    status = "✅" if count == 0 else "⚠️"
+    with st.expander(f"{status} {label} — {count} row(s)"):
+        if count == 0:
+            st.success("No issues found.")
+        else:
+            subset = df[df["QA_Flags"].str.contains(keyword, na=False)]
+            cols_to_show = [c for c in ["FirstName", "LastName", "Email", "LegacyId", "QA_Flags"] if c in subset.columns]
+            st.dataframe(subset[cols_to_show], use_container_width=True)
+            st.download_button(
+                f"Download — {label}",
+                subset.to_csv(index=False).encode("utf-8"),
+                f"qa_{keyword.replace(' ', '_').replace(':', '').lower()}.csv",
+                "text/csv",
+                key=f"dl_{keyword}"
+            )
+
+st.write("")
+
+# -----------------------------
+# Downloads
+# -----------------------------
+st.subheader("Downloads")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if len(flagged_rows) > 0:
+        st.download_button(
+            "Download Flagged Rows",
+            flagged_rows.to_csv(index=False).encode("utf-8"),
+            "qa_flagged_rows.csv",
+            "text/csv"
+        )
+
+with col2:
     st.download_button(
-        "Download Flagged Rows",
-        flagged_rows.to_csv(index=False).encode("utf-8"),
-        "qa_flagged_rows.csv",
+        "Download Clean Rows",
+        clean_rows.drop(columns=["QA_Flags", "QA_Pass"], errors="ignore").to_csv(index=False).encode("utf-8"),
+        "qa_clean_rows.csv",
         "text/csv"
     )
 
-# -----------------------------
-# Clean rows
-# -----------------------------
-st.subheader("Clean Rows Preview")
-st.dataframe(clean_rows.drop(columns=["QA_Flags", "QA_Pass"], errors="ignore"), use_container_width=True)
-st.download_button(
-    "Download Clean Rows",
-    clean_rows.drop(columns=["QA_Flags", "QA_Pass"], errors="ignore").to_csv(index=False).encode("utf-8"),
-    "qa_clean_rows.csv",
-    "text/csv"
-)
-
-# -----------------------------
-# Full file with flags
-# -----------------------------
-st.subheader("Full File with QA Flags")
-st.dataframe(df, use_container_width=True)
-st.download_button(
-    "Download Full File with Flags",
-    df.to_csv(index=False).encode("utf-8"),
-    "qa_full_output.csv",
-    "text/csv"
-)
+with col3:
+    st.download_button(
+        "Download Full File with Flags",
+        df.to_csv(index=False).encode("utf-8"),
+        "qa_full_output.csv",
+        "text/csv"
+    )
 
 st.markdown("""
 <div class="hub-footer">
