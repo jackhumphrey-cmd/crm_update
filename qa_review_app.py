@@ -172,7 +172,7 @@ if not migration_file:
 
 with st.spinner("Running QA checks..."):
 
-    df = pd.read_csv(migration_file, dtype=str)
+    df = pd.read_csv(migration_file, dtype=str, keep_default_na=False)
     df.columns = df.columns.str.strip()
 
     # -----------------------------
@@ -297,13 +297,13 @@ st.write("")
 # Per-check expanders
 # -----------------------------
 checks = [
-    ("Missing Required Fields",  "Missing:",                missing_count),
-    ("Split Amount Mismatches",  "Split mismatch",          split_count),
-    ("Unmapped IDs (#N/A)",      "Unmapped ID",             na_count),
-    ("Invalid Payment Type",     "Invalid PaymentMethodType", pmt_count),
-    ("Invalid Date Format",      "Invalid date format",     date_count),
-    ("Multiple Names in FirstName", "Multiple names",       name_count),
-    ("Invalid Frequency",        "Invalid Frequency",       freq_count),
+    ("Missing Required Fields",     "Missing:",                  missing_count),
+    ("Split Amount Mismatches",     "Split mismatch",            split_count),
+    ("Unmapped IDs (#N/A)",         "Unmapped ID",               na_count),
+    ("Invalid Payment Type",        "Invalid PaymentMethodType", pmt_count),
+    ("Invalid Date Format",         "Invalid date format",       date_count),
+    ("Multiple Names in FirstName", "Multiple names",            name_count),
+    ("Invalid Frequency",           "Invalid Frequency",         freq_count),
 ]
 
 for label, keyword, count in checks:
