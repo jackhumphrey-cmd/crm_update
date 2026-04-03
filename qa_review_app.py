@@ -184,7 +184,7 @@ with st.spinner("Running QA checks..."):
         "CustomerId", "Project1Code", "Project1Name", "Project1Amount"
     ]
     VALID_PAYMENT_TYPES = {"Credit", "ACH"}
-    VALID_FREQUENCIES   = {"Monthly", "Annually", "Fortnightly", "Quarterly", "Semiannually"}
+    VALID_FREQUENCIES   = {"Monthly","Weekly", "Annually", "Fortnightly", "Quarterly", "Semiannually"}
     DATE_PATTERN        = re.compile(r"^\d{1,2}/\d{1,2}/\d{2,4}$")
     MULTI_NAME_PATTERN  = re.compile(r"&| and ", re.IGNORECASE)
 
