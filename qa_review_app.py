@@ -184,7 +184,7 @@ with st.spinner("Running QA checks..."):
         "CustomerId", "Project1Code", "Project1Name", "Project1Amount"
     ]
     VALID_PAYMENT_TYPES = {"Credit", "ACH"}
-    VALID_FREQUENCIES   = {"Monthly","Weekly", "Annually", "Fortnightly", "Quarterly", "Semiannually"}
+    VALID_FREQUENCIES   = {"Monthly", "Weekly", "Annually", "Fortnightly", "Quarterly", "Semiannually"}
     DATE_PATTERN        = re.compile(r"^\d{1,2}/\d{1,2}/\d{2,4}$")
     MULTI_NAME_PATTERN  = re.compile(r"&| and ", re.IGNORECASE)
 
@@ -223,11 +223,11 @@ with st.spinner("Running QA checks..."):
         except (ValueError, TypeError):
             row_flags.append("Split mismatch: could not parse Amount or project amounts")
 
-        # 3. #N/A in PaymentMethodId or CustomerId
+        # 3. Excel error values or #N/A in PaymentMethodId or CustomerId
         for field in ["PaymentMethodId", "CustomerId"]:
             val = str(row.get(field, "")).strip()
-            if val == "#N/A":
-                row_flags.append(f"Unmapped ID: {field} = #N/A")
+            if val.startswith("#"):
+                row_flags.append(f"Unmapped ID: {field} = {val}")
 
         # 4. PaymentMethodType must be Credit or ACH
         pmt = str(row.get("PaymentMethodType", "")).strip()
